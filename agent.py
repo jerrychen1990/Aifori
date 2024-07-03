@@ -9,10 +9,10 @@
 
 
 import os
-from pyexpat.errors import messages
 from typing import Iterable, List
 from zhipuai import ZhipuAI
 from pydantic import BaseModel
+from loguru import logger
 
 
 class AgentInfo(BaseModel):
@@ -23,6 +23,7 @@ class AgentInfo(BaseModel):
 def chat_llm(user_info: AgentInfo, agent_info: AgentInfo, model, messages: List[str], stream=True):
     client = ZhipuAI(api_key=os.environ.get("ZHIPUAI_API_KEY"))  # 填写您自己的APIKey
     meta = dict(user_info=user_info.desc, user_name=user_info.name, bot_info=agent_info.desc, bot_name=agent_info.name)
+    logger.debug(f"calling llm with: {meta=} {model=} {messages=}")
 
     response = client.chat.completions.create(
         model=model,  # 填写需要调用的模型名称
@@ -34,12 +35,15 @@ def chat_llm(user_info: AgentInfo, agent_info: AgentInfo, model, messages: List[
         return response.choices[0].message.content
     else:
         def _gen():
+            acc = ""
             for chunk in response:
                 # print(chunk)
-                yield chunk.choices[0].delta.content if chunk.choices[0].delta else ""
+                resp = chunk.choices[0].delta.content if chunk.choices[0].delta else ""
+                if resp:
+                    yield resp
+                    acc += resp
+            logger.debug(f"streaming response :{acc}")
         return _gen()
-
-    return response
 
 
 class Agent:
