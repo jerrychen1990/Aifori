@@ -4,3 +4,4 @@ elevenlabs
 openai
 agent
 pydantic
+loguru
