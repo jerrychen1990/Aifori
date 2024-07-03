@@ -14,6 +14,10 @@ from agent import *
 from tts import tts
 from config import *
 
+for k, v in st.secrets.items():
+    os.environ[k] = v
+
+
 models = ["emohaa"]
 user_name = st.sidebar.text_input("用户名", "NoBody")
 user_desc = st.sidebar.text_area("用户描述", "一个空巢年轻人,没有朋友,没有爱人,没有工作,没有希望。喜欢音乐和诗歌，喜欢一切华美而哀伤的事物。", height=100)

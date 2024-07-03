@@ -21,7 +21,7 @@ class AgentInfo(BaseModel):
 
 
 def chat_llm(user_info: AgentInfo, agent_info: AgentInfo, model, messages: List[str], stream=True):
-    client = ZhipuAI(api_key=os.environ.get("ZHIPUAI_API_KEY"))  # 填写您自己的APIKey
+    client = ZhipuAI(api_key=os.environ["ZHIPUAI_API_KEY"])  # 填写您自己的APIKey
     meta = dict(user_info=user_info.desc, user_name=user_info.name, bot_info=agent_info.desc, bot_name=agent_info.name)
     logger.debug(f"calling llm with: {meta=} {model=} {messages=}")
 

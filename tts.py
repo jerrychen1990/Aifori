@@ -15,8 +15,8 @@ from config import *
 
 
 def minimax_tts(text, tgt_path, model="speech-01-turbo", voice_id="male-qn-qingse", speed=1, pitch=0):
-    group_id = os.getenv("MINIMAX_GROUP_ID")
-    api_key = os.getenv("MINIMAX_API_KEY")
+    group_id = os.environ["MINIMAX_GROUP_ID"]
+    api_key = os.environ["MINIMAX_API_KEY"]
     # print(group_id)
     # print(api_key)
     url = f"https://api.minimax.chat/v1/t2a_v2?GroupId={group_id}"
