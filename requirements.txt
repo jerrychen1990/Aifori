@@ -5,3 +5,7 @@ openai
 agent
 pydantic
 loguru
+python-dotenv
+
+liteai
+python-snippets

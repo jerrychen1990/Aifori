@@ -11,20 +11,23 @@
 import json
 import os
 import requests
-from config import *
+from loguru import logger
+from her.config import *
+from snippets import jdumps
 
 
-def minimax_tts(text, tgt_path, model="speech-01-turbo", voice_id="male-qn-qingse", speed=1, pitch=0):
+def minimax_tts(text, tgt_path, model="speech-01-turbo",
+                stream=False, voice_id="male-qn-qingse", speed=1, pitch=0):
     group_id = os.environ["MINIMAX_GROUP_ID"]
     api_key = os.environ["MINIMAX_API_KEY"]
     # print(group_id)
     # print(api_key)
     url = f"https://api.minimax.chat/v1/t2a_v2?GroupId={group_id}"
 
-    payload = json.dumps({
+    payload = {
         "model": model,
         "text": text,
-        "stream": False,
+        "stream": stream,
         "voice_setting": {
             "voice_id": voice_id,
             "speed": speed,
@@ -37,24 +40,40 @@ def minimax_tts(text, tgt_path, model="speech-01-turbo", voice_id="male-qn-qings
             "format": "mp3",
             "channel": 1
         }
-    })
+    }
     headers = {
         'Authorization': f'Bearer {api_key}',
         'Content-Type': 'application/json'
     }
     # print(payload)
+    logger.info(f"calling minimax tts with payload: {jdumps(payload)}")
 
-    response = requests.request("POST", url, stream=True, headers=headers, data=payload)
+    response = requests.request("POST", url, headers=headers, stream=stream, json=payload)
     response.raise_for_status()
+    if not stream:
+        data = response.json()
+        # logger.info(f"{data=}")
+        # print(f"{data=}")
+        if "data" not in data:
+            logger.exception(data)
+            raise Exception(data)
+        audio_value = bytes.fromhex(data['data']['audio'])
+        with open(tgt_path, 'wb') as f:
+            f.write(audio_value)
+        return tgt_path
+    else:
+        def gen():
+            for chunk in (response.raw):
+                if chunk:
+                    # print(chunk)
+                    if chunk[:5] == b'data:':
+                        data = json.loads(chunk[5:])
+                        if "data" in data and "extra_info" not in data:
+                            if "audio" in data["data"]:
+                                audio = data["data"]['audio']
+                                yield audio
+        return gen()
 
-    data = response.json()
-    # print(data)
-    # 获取audio字段的值
-    if "data" not in data:
-        raise Exception(data)
-    audio_value = bytes.fromhex(data['data']['audio'])
-    with open(tgt_path, 'wb') as f:
-        f.write(audio_value)
 
 # get md5 of text
 
@@ -68,8 +87,9 @@ def get_md5(text):
 
 def tts(text, provider="minimax", tgt_path=None, **kwargs):
     if not tgt_path:
-        tgt_path = os.path.join(voice_dir, provider, get_md5(text) + ".mp3")
+        tgt_path = os.path.join(VOICE_DIR, provider, get_md5(text) + ".mp3")
     os.makedirs(os.path.dirname(tgt_path), exist_ok=True)
+    logger.info(f"{provider=}, {kwargs=}")
     if provider == "minimax":
         minimax_tts(text, tgt_path=tgt_path, **kwargs)
     return tgt_path

@@ -13,6 +13,7 @@ from typing import Iterable, List
 from zhipuai import ZhipuAI
 from pydantic import BaseModel
 from loguru import logger
+from liteai.api import chat
 
 
 class AgentInfo(BaseModel):
@@ -20,10 +21,11 @@ class AgentInfo(BaseModel):
     desc: str
 
 
-def chat_llm(user_info: AgentInfo, agent_info: AgentInfo, model, messages: List[str], stream=True):
-    client = ZhipuAI(api_key=os.environ["ZHIPUAI_API_KEY"])  # 填写您自己的APIKey
+def call_lingxin(user_info: AgentInfo, agent_info: AgentInfo, model: str, messages: List[str], stream=True):
+    api_key = os.environ["ZHIPU_API_KEY"]
+    client = ZhipuAI(api_key=api_key)  # 填写您自己的APIKey
     meta = dict(user_info=user_info.desc, user_name=user_info.name, bot_info=agent_info.desc, bot_name=agent_info.name)
-    logger.debug(f"calling llm with: {meta=} {model=} {messages=}")
+    logger.info(f"calling lingxin with: {meta=} {model=} {messages=}, {api_key=}")
 
     response = client.chat.completions.create(
         model=model,  # 填写需要调用的模型名称
@@ -46,12 +48,26 @@ def chat_llm(user_info: AgentInfo, agent_info: AgentInfo, model, messages: List[
         return _gen()
 
 
+def chat_llm(user_info: AgentInfo, agent_info: AgentInfo, model: str, messages: List[str], stream=True, **kwargs):
+    if model.lower() in ["emohaa", "charglm-3"]:
+        return call_lingxin(user_info, agent_info, model, messages, stream=stream)
+    else:
+        system = f"""你的任务是根据自己的信息，以及用户的信息，提供良好的陪伴服务
+你的名字:{agent_info.name}
+你的描述:{agent_info.desc}
+用户名字: {user_info.name}
+用户描述: {user_info.desc}
+"""
+        messages.insert(0, {"role": "system", "content": system})
+        return chat(model=model, messages=messages, stream=stream, **kwargs).content
+
+
 class Agent:
     def __init__(self, agent_info: AgentInfo):
         self.agent_info = agent_info
 
-    def chat(self, user_info: AgentInfo, model: str, messages: List[str], stream=True) -> Iterable[str]:
-        return chat_llm(user_info, self.agent_info, model, messages, stream=stream)
+    def chat(self, user_info: AgentInfo, model: str, messages: List[str], stream=True, **kwargs) -> Iterable[str]:
+        return chat_llm(user_info, self.agent_info, model, messages, stream=stream, **kwargs)
 
 
 if __name__ == "__main__":

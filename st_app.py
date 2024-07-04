@@ -10,26 +10,25 @@
 import uuid
 import streamlit as st
 
-from agent import *
-from tts import tts
-from config import *
+from her.agent import Agent, AgentInfo
+from her.tts import tts
+from her.config import *
+from loguru import logger
 
-for k, v in st.secrets.items():
-    os.environ[k] = v
-
-
-models = ["emohaa"]
-user_name = st.sidebar.text_input("用户名", "NoBody")
-user_desc = st.sidebar.text_area("用户描述", "一个空巢年轻人,没有朋友,没有爱人,没有工作,没有希望。喜欢音乐和诗歌，喜欢一切华美而哀伤的事物。", height=100)
-
-ai_name = st.sidebar.text_input("AI名称", "Samantha")
-ai_desc = st.sidebar.text_area("用户描述", f"{ai_name}是一款基于Hill助人理论的情感支持AI，拥有专业的心理咨询话术能力。富有同情心和同理心，说话简洁而幽默", height=100)
+# print(logger._core.handlers)
 
 
-model = st.sidebar.selectbox("模型", models)
-character = st.sidebar.selectbox("音色", character_map.keys())
+user_name = st.sidebar.text_input("用户名", DEFAULT_USER_NAME)
+user_desc = st.sidebar.text_area("用户描述", DEFAULT_USER_DESC, height=100)
+
+ai_name = st.sidebar.text_input("AI名称", DEFAULT_AI_NAME)
+ai_desc = st.sidebar.text_area("用户描述", DEFAULT_AI_DESC, height=100)
+
+
+model = st.sidebar.selectbox("模型", LLM_MODELS)
+character = st.sidebar.selectbox("音色", CHARACTER_MAP.keys())
 clear = st.sidebar.button("清空历史")
-voice_id = character_map[character]["voice_id"]
+voice_id = CHARACTER_MAP[character]["voice_id"]
 # desc = character_map[character]["desc"]
 speed = st.sidebar.slider("语速", 0.5, 2.0, 1.0)
 pitch = st.sidebar.slider("音调", -12, 12, 0, 1)
@@ -80,15 +79,15 @@ if prompt := st.chat_input("你好，你是谁？"):
         # st.info(full_response)
         message_placeholder.markdown(full_response + "▌")
     message_placeholder.markdown(full_response)
-    tgt_path = os.path.join(voice_dir, "minimax", f"{session_id}_{idx}.mp3")
-    voice_path = tts(full_response, provider="minimax", tgt_path=tgt_path, voice_id=voice_id, speed=speed, pitch=pitch)
-    # logger.info(voice_path)
+    tgt_path = os.path.join(VOICE_DIR, "minimax", f"{session_id}_{idx}.mp3")
+    gen_voice = tts(full_response, provider="minimax", tgt_path=tgt_path, voice_id=voice_id, speed=speed, pitch=pitch, stream=False)
+    # logger.info(f"{gen_voice=}")
     user_message = {"role": "user", "content": prompt, "session_id": session_id}
-    assistant_message = {"role": "assistant", "content": full_response, "session_id": session_id}
+    assistant_message = {"role": "assistant", "content": full_response, "session_id": session_id, "gen_voice": gen_voice}
 
     logger.info(f"{user_message=}")
     logger.info(f"{assistant_message=}")
-    st.audio(voice_path, format='audio/mp3', autoplay=True)
+    st.audio(gen_voice, format='audio/mp3', autoplay=True)
 
     st.session_state.messages.append(
         user_message

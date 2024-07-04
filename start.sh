@@ -1,0 +1,1 @@
+/Users/chenhao/miniconda3/envs/her/bin/streamlit run st_app.py 

@@ -166,3 +166,6 @@ logs/
 voices/
 test.ipynb
 .streamlit/secrets.toml
+.DS_Store
+*.ipynb
+test.ipynb
