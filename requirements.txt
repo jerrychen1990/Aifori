@@ -1,11 +1,11 @@
-zhipuai
 requests
-elevenlabs
-openai
-agent
 pydantic
 loguru
 python-dotenv
+fastapi
+uvicorn
+
 
 liteai
 python-snippets
+streamlit

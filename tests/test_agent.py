@@ -8,7 +8,7 @@
 '''
 
 import unittest
-from her.agent import *
+from aifori.agent import *
 
 
 class TestAgent(unittest.TestCase):

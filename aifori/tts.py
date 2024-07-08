@@ -12,7 +12,7 @@ import json
 import os
 import requests
 from loguru import logger
-from her.config import *
+from aifori.config import *
 from snippets import jdumps
 
 
@@ -71,7 +71,7 @@ def minimax_tts(text, tgt_path, model="speech-01-turbo",
                         if "data" in data and "extra_info" not in data:
                             if "audio" in data["data"]:
                                 audio = data["data"]['audio']
-                                yield audio
+                                yield bytes.fromhex(audio)
         return gen()
 
 

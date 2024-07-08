@@ -10,9 +10,9 @@
 import uuid
 import streamlit as st
 
-from her.agent import Agent, AgentInfo
-from her.tts import tts
-from her.config import *
+from aifori.agent import Agent, AgentInfo
+from aifori.tts import tts
+from aifori.config import *
 from loguru import logger
 
 # print(logger._core.handlers)
