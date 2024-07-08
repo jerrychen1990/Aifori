@@ -169,3 +169,5 @@ test.ipynb
 .DS_Store
 *.ipynb
 test.ipynb
+.history/
+sessions/

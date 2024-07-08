@@ -9,13 +9,17 @@
 
 
 from abc import abstractmethod
+import os
 from typing import List
 from pydantic import BaseModel, Field
+from aifori.config import SESSION_DIR
 from liteai.core import Message
 import uuid
+from snippets import dump
+from loguru import logger
 
 
-class HumanMessage(Message):
+class UserMessage(Message):
     role: str = "user"
 
     # class Config:
@@ -56,12 +60,21 @@ class Agent:
 
 
 class Session(BaseModel):
-    id: str = Field(default=uuid.uuid4, description="session id")
+    id: str = Field(default_factory=uuid.uuid4, description="session id")
     history: list[Message] = Field(default_factory=list, description="session history")
-    assistant: Agent = Field(description="assistant")
-    human: Agent = Field(description="human ")
+    assistant_info: AgentInfo = Field(description="assistant")
+    user_info: AgentInfo = Field(description="human ")
 
     class Config:
         arbitrary_types_allowed = True
-        
-    
+
+    def to_json(self):
+        rs = self.model_dump(exclude={"history"})
+        rs.update(history_len=len(self.history))
+        return rs
+
+    def save(self):
+        tgt_path = os.path.join(SESSION_DIR, f"{self.id}.json")
+        logger.info(f"save session to {tgt_path}")
+
+        dump(self.model_dump(), tgt_path)

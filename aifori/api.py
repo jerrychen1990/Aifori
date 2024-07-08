@@ -10,9 +10,9 @@ from aifori.config import *
 from aifori.core import Session
 from snippets import load
 
-def get_session(session_id):
-    file_path = os.path.join(SESSION_DIR, session_id+".json") 
-    session_config = load(file_path)   
-    Session = Session(session_config)
 
-    pass
+def get_session(session_id: str) -> Session:
+    file_path = os.path.join(SESSION_DIR, session_id+".json")
+    session_config = load(file_path)
+    session = Session.model_validate(session_config)
+    return session

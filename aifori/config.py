@@ -1,7 +1,9 @@
 from os import curdir
 import os
+from loguru import logger
 
-AIFORI_HOME = os.getenv("AIFORI_HOME", os.path.pardir(curdir))
+AIFORI_HOME = os.getenv("AIFORI_HOME", os.path.dirname(curdir))
+logger.info(f"AIFORI_HOME: {AIFORI_HOME}")
 
 VOICE_DIR = os.path.join(AIFORI_HOME, "voices")
 os.makedirs(VOICE_DIR, exist_ok=True)

@@ -8,13 +8,13 @@
 '''
 
 
-from aifori.core import Agent, AgentInfo, AssistantMessage, HumanMessage
+from aifori.core import Agent, AgentInfo, AssistantMessage, UserMessage
 from aifori.memory import RawMemory
 from liteai.api import chat
 
 
 class AIAgent(Agent):
-    def chat(self, message: HumanMessage, stream=False) -> AssistantMessage:
+    def chat(self, message: UserMessage, stream=False) -> AssistantMessage:
         history = self.memory.to_llm_messages()
         messages = history + [message]
 
@@ -86,5 +86,5 @@ if __name__ == "__main__":
     assistant = AIAgent(agent_info=AgentInfo(
         name="Emohaa", desc="Emohaa是一款基于Hill助人理论的情感支持AI，拥有专业的心理咨询话术能力。能够和对方共情、安慰，并且记得对方说的所有话", role="assistant"), memory=memory)
 
-    resp = assistant.chat(message=HumanMessage(content="最近我感觉压力很大，情绪总是很低落。", name="张三"))
+    resp = assistant.chat(message=UserMessage(content="最近我感觉压力很大，情绪总是很低落。", name="张三"))
     print(resp)
