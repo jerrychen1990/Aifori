@@ -1,8 +1,13 @@
 from os import curdir
 import os
 
-VOICE_DIR = curdir + "/voices"
+AIFORI_HOME = os.getenv("AIFORI_HOME", os.path.pardir(curdir))
+
+VOICE_DIR = os.path.join(AIFORI_HOME, "voices")
 os.makedirs(VOICE_DIR, exist_ok=True)
+
+SESSION_DIR = os.path.join(AIFORI_HOME, "sessions")
+os.makedirs(SESSION_DIR, exist_ok=True)
 
 
 LLM_MODELS = ["emohaa", "charglm-3", "glm-4-airx"]

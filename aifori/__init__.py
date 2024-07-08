@@ -8,14 +8,14 @@
 '''
 
 
-import os
-import streamlit as st
 from snippets import set_logger
-from loguru import logger
+from dotenv import load_dotenv
+
 
 set_logger("DEV", __name__, "./logs")
+load_dotenv()
 
 
-for k, v in st.secrets.items():
-    logger.info(f"set env {k}={v}")
-    os.environ[k] = v
+# for k, v in st.secrets.items():
+#     logger.info(f"set env {k}={v}")
+#     os.environ[k] = v
