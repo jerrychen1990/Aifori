@@ -1,1 +1,1 @@
-pelican --listen --port 9003 --bind 0.0.0.0 --output web/output --verbose
+pelican --listen --port 80 --bind 0.0.0.0 --output web/output --verbose

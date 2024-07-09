@@ -9,3 +9,4 @@ uvicorn
 liteai
 python-snippets
 streamlit
+pelican
