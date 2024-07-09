@@ -14,6 +14,9 @@ os.makedirs(SESSION_DIR, exist_ok=True)
 AGENT_DIR = os.path.join(AIFORI_HOME, "agents")
 os.makedirs(AGENT_DIR, exist_ok=True)
 
+DATA_DIR = os.path.join(AIFORI_HOME, "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+
 LLM_MODELS = ["emohaa", "charglm-3", "glm-4-airx"]
 
 DEFAULT_USER_NAME = "NoBody"
