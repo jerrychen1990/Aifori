@@ -2,7 +2,7 @@ from os import curdir
 import os
 from loguru import logger
 
-AIFORI_HOME = os.getenv("AIFORI_HOME", os.path.dirname(curdir))
+AIFORI_HOME = os.getenv("AIFORI_HOME", os.path.abspath(os.path.dirname(curdir)))
 logger.info(f"AIFORI_HOME: {AIFORI_HOME}")
 
 VOICE_DIR = os.path.join(AIFORI_HOME, "voices")
@@ -11,6 +11,8 @@ os.makedirs(VOICE_DIR, exist_ok=True)
 SESSION_DIR = os.path.join(AIFORI_HOME, "sessions")
 os.makedirs(SESSION_DIR, exist_ok=True)
 
+AGENT_DIR = os.path.join(AIFORI_HOME, "agents")
+os.makedirs(AGENT_DIR, exist_ok=True)
 
 LLM_MODELS = ["emohaa", "charglm-3", "glm-4-airx"]
 

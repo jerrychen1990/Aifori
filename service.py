@@ -31,7 +31,7 @@ def exception2resp(e: Exception) -> Response:
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    return Response(data=dict(status="ok"))
 
 
 @app.post("/session/create", tags=["session"])

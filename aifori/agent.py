@@ -8,19 +8,21 @@
 '''
 
 
-from aifori.core import Agent, AgentInfo, AssistantMessage, UserMessage
+from aifori.core import Agent, AgentInfo, AssistantMessage, Message, UserMessage
 from aifori.memory import RawMemory
 from liteai.api import chat
 
 
 class AIAgent(Agent):
-    def chat(self, message: UserMessage, stream=False) -> AssistantMessage:
+    def _chat(self, message: UserMessage, stream=False, **kwargs) -> AssistantMessage:
         history = self.memory.to_llm_messages()
         messages = history + [message]
-
         llm_resp = chat(model="glm-4-air", messages=messages, stream=stream)
         resp = AssistantMessage(name=self.name, content=llm_resp.content)
         return resp
+
+    def remember(self, message: Message):
+        self.memory.add_message(message)
 
 
 class HumanAgent(Agent):

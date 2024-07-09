@@ -9,14 +9,21 @@
 
 import copy
 from typing import List
+
 from aifori.core import Memory, Message, Memory
 from liteai.core import Message
+from pydantic import Field
 
 
 class RawMemory(Memory):
-    def __init__(self, size: int = 10, history: List[Message | dict] = []):
-        self.size = size
-        self.history: List[Message] = [e if isinstance(e, Message) else Message(**e) for e in history]
+    size: int = Field(..., description="The size of the memory")
+    history: List[Message] = Field([], description="The history of the memory")
 
     def to_llm_messages(self) -> List[Message]:
         return copy.copy(self.history)
+
+    def add_message(self, message: Message) -> None:
+        self.history.append(message)
+
+    def to_json(self) -> dict:
+        return {"size": self.size, "history": self.history}

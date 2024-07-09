@@ -12,11 +12,15 @@ from abc import abstractmethod
 import os
 from typing import List
 from pydantic import BaseModel, Field
-from aifori.config import SESSION_DIR
-from liteai.core import Message
+from aifori.config import AGENT_DIR, SESSION_DIR
+from liteai.core import Message as LMessage
 import uuid
-from snippets import dump
+from snippets import dump, load
 from loguru import logger
+
+
+class Message(LMessage):
+    name: str = Field(description="user name")
 
 
 class UserMessage(Message):
@@ -39,11 +43,14 @@ class AgentInfo(BaseModel):
     desc: str = Field(description="assistant description")
 
 
-class Memory:
-    def add(self, message: Message):
+class Memory(BaseModel):
+    def add_message(self, message: Message):
         raise NotImplementedError
 
     def to_llm_messages(self) -> List[Message]:
+        raise NotImplementedError
+
+    def to_json(self) -> dict:
         raise NotImplementedError
 
 
@@ -52,11 +59,37 @@ class Agent:
         self.name = agent_info.name
         self.desc = agent_info.desc
         self.role = agent_info.role
+        self.agent_info = agent_info
         self.memory = memory
 
-    @abstractmethod
-    def chat(self, name: str, message: Message, stream=False) -> Message:
+    def _chat(self, message: Message, stream=False) -> Message:
         raise NotImplementedError
+
+    @abstractmethod
+    def chat(self, message: Message, stream=False, do_remember=True, **kwargs) -> Message:
+        resp_message = self._chat(message, stream, **kwargs)
+        if do_remember:
+            self.remember(message)
+            self.remember(resp_message)
+        return resp_message
+
+    @abstractmethod
+    def remember(self, message: Message):
+        raise NotImplementedError
+
+    def save(self):
+        agent_config_path = os.path.join(AGENT_DIR, f"{self.name}.json")
+        data = dict(agent_info=self.agent_info.model_dump(), memory=self.memory.to_json())
+        logger.info(f"save agent {data} to {agent_config_path}")
+        dump(data, agent_config_path)
+        return agent_config_path
+
+    @classmethod
+    def load(cls, path: str):
+        data = load(path)
+        agent_info = AgentInfo(**data["agent_info"])
+        memory = Memory(**data["memory"])
+        return cls(agent_info=agent_info, memory=memory)
 
 
 class Session(BaseModel):
