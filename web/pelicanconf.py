@@ -1,12 +1,12 @@
 AUTHOR = 'hao'
 SITENAME = 'Aifori'
-SITEURL = ""
+SITEURL = "https://aifori.fun"
 
 PATH = "content"
 
 TIMEZONE = 'Asia/Shanghai'
 
-DEFAULT_LANG = 'en'
+DEFAULT_LANG = 'zh'
 
 # Feed generation is usually not desired when developing
 FEED_ALL_ATOM = None
