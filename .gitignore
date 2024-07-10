@@ -171,5 +171,4 @@ test.ipynb
 test.ipynb
 .history/
 sessions/
-data/
-
+data/adopters.jsonl
