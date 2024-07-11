@@ -8,21 +8,55 @@
 '''
 
 
-from aifori.core import Agent, AgentInfo, AssistantMessage, Message, UserMessage
+from loguru import logger
+from aifori.core import Agent, AgentInfo, AssistantMessage, Memory, Message, UserMessage
 from aifori.memory import RawMemory
 from liteai.api import chat
+from liteai.core import ModelResponse
+from snippets import load
 
 
 class AIAgent(Agent):
-    def _chat(self, message: UserMessage, stream=False, **kwargs) -> AssistantMessage:
+    def __init__(self, model: str, memory: Memory, **kwargs):
+        super().__init__(**kwargs)
+        self.role = "assistant"
+        self.memory = memory
+        self.model = model
+
+    def _chat(self, message: UserMessage, stream=False, **kwargs) -> ModelResponse:
         history = self.memory.to_llm_messages()
         messages = history + [message]
-        llm_resp = chat(model="glm-4-air", messages=messages, stream=stream)
-        resp = AssistantMessage(name=self.name, content=llm_resp.content)
-        return resp
+        llm_resp = chat(model=self.model, messages=messages, stream=stream, **kwargs)
+        return llm_resp
 
-    def remember(self, message: Message):
-        self.memory.add_message(message)
+    def get_config(self):
+        config = super().get_config()
+        config.update(model=self.model, memory=self.memory)
+        return config
+
+    @classmethod
+    def from_config(cls, path: str):
+        data = load(path)
+        data["memory"] = RawMemory.model_validate(data["memory"])
+        logger.debug(f"load agent from {path} with {data}")
+        return cls(**data)
+
+    def remember(self, message: Message | ModelResponse):
+        if isinstance(message, Message):
+            self.memory.add_message(message)
+        if isinstance(message, ModelResponse):
+            if isinstance(message.content, str):
+                self.memory.add_message(AssistantMessage(content=message.content, name=self.name))
+            else:
+                def _gen():
+                    acc = ""
+                    for chunk in message.content:
+                        yield chunk
+                        acc += chunk
+                    self.memory.add_message(AssistantMessage(content=acc, name=self.name))
+
+                return ModelResponse(content=_gen(), image=message.image)
+        return message
 
 
 class HumanAgent(Agent):

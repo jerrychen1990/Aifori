@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from aifori.config import AGENT_DIR, SESSION_DIR
 from liteai.core import Message as LMessage
 import uuid
-from snippets import dump, load
+from snippets import dump
 from loguru import logger
 
 
@@ -33,9 +33,6 @@ class UserMessage(Message):
 class AssistantMessage(Message):
     role: str = "assistant"
 
-    # class Config:
-    #     arbitrary_types_allowed = True
-
 
 class AgentInfo(BaseModel):
     name: str = Field(description="assistant name")
@@ -50,46 +47,41 @@ class Memory(BaseModel):
     def to_llm_messages(self) -> List[Message]:
         raise NotImplementedError
 
-    def to_json(self) -> dict:
-        raise NotImplementedError
+    # def to_json(self) -> dict:
+    #     raise NotImplementedError
 
 
 class Agent:
-    def __init__(self, agent_info: AgentInfo, memory: Memory):
-        self.name = agent_info.name
-        self.desc = agent_info.desc
-        self.role = agent_info.role
-        self.agent_info = agent_info
-        self.memory = memory
+    def __init__(self, name: str, desc: str, id: str = None):
+        self.id = id if id else str(uuid.uuid4())
+        self.name = name
+        self.desc = desc
 
     def _chat(self, message: Message, stream=False) -> Message:
         raise NotImplementedError
 
     @abstractmethod
-    def chat(self, message: Message, stream=False, do_remember=True, **kwargs) -> Message:
+    def chat(self, message: Message, stream=False, do_remember=True, **kwargs):
         resp_message = self._chat(message, stream, **kwargs)
         if do_remember:
+            logger.debug(f"remember message {message} and {resp_message}")
             self.remember(message)
-            self.remember(resp_message)
+            resp_message = self.remember(resp_message)
         return resp_message
 
     @abstractmethod
-    def remember(self, message: Message):
+    def remember(self, message):
         raise NotImplementedError
 
-    def save(self):
-        agent_config_path = os.path.join(AGENT_DIR, f"{self.name}.json")
-        data = dict(agent_info=self.agent_info.model_dump(), memory=self.memory.to_json())
-        logger.info(f"save agent {data} to {agent_config_path}")
-        dump(data, agent_config_path)
-        return agent_config_path
+    def get_config(self):
+        return dict(name=self.name, desc=self.desc, id=self.id)
 
-    @classmethod
-    def load(cls, path: str):
-        data = load(path)
-        agent_info = AgentInfo(**data["agent_info"])
-        memory = Memory(**data["memory"])
-        return cls(agent_info=agent_info, memory=memory)
+    def save(self):
+        agent_config_path = os.path.join(AGENT_DIR, f"{self.id}.json")
+        config = self.get_config()
+        logger.info(f"save agent {config} to {agent_config_path}")
+        dump(config, agent_config_path)
+        return agent_config_path
 
 
 class Session(BaseModel):

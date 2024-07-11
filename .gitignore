@@ -172,3 +172,4 @@ test.ipynb
 .history/
 sessions/
 data/adopters.jsonl
+agents/

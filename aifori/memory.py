@@ -13,6 +13,7 @@ from typing import List
 from aifori.core import Memory, Message, Memory
 from liteai.core import Message
 from pydantic import Field
+from loguru import logger
 
 
 class RawMemory(Memory):
@@ -25,5 +26,6 @@ class RawMemory(Memory):
     def add_message(self, message: Message) -> None:
         self.history.append(message)
 
-    def to_json(self) -> dict:
-        return {"size": self.size, "history": self.history}
+    # def to_json(self) -> dict:
+    #     logger.debug(f"history: {self.history}")
+    #     return {"size": self.size, "history": self.history}
