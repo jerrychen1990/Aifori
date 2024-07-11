@@ -13,12 +13,11 @@ from typing import List
 from aifori.core import Memory, Message, Memory
 from liteai.core import Message
 from pydantic import Field
-from loguru import logger
 
 
 class RawMemory(Memory):
-    size: int = Field(..., description="The size of the memory")
-    history: List[Message] = Field([], description="The history of the memory")
+    size: int = Field(default=10, description="The size of the memory")
+    history: List[Message] = Field(default=[], description="The history of the memory")
 
     def to_llm_messages(self) -> List[Message]:
         return copy.copy(self.history)

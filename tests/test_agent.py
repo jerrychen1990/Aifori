@@ -9,6 +9,7 @@
 
 import unittest
 from aifori.agent import *
+from aifori.api import get_assistant
 from loguru import logger
 from snippets import set_logger
 
@@ -38,8 +39,8 @@ class TestAgent(unittest.TestCase):
             logger.info(item)
 
         # 测试save/load
-        agent_path = agent.save()
-        agent = AIAgent.from_config(agent_path)
+        agent.save()
+        agent = get_assistant(agent.id)
 
         # 测试多轮
         message: AssistantMessage = UserMessage(content="详细介绍一下第三首", name="Nobody")

@@ -1,10 +1,12 @@
 from fastapi import Body, FastAPI
 from aifori.agent import AIAgent
-from aifori.core import AgentInfo
+from aifori.core import UserMessage
 from pydantic import BaseModel, Field
 from typing import Any
 
+from aifori.api import get_assistant
 from aifori.memory import RawMemory
+from loguru import logger
 
 app = FastAPI()
 
@@ -34,29 +36,22 @@ async def health():
 
 
 @app.post("/agent/create", tags=["agent"])
-async def create_agent(agent_info: AgentInfo = Body(example=AgentInfo(
-        name="Emohaa", desc="Emohaa是一款基于Hill助人理论的情感支持AI，拥有专业的心理咨询话术能力。能够和对方共情、安慰，并且记得对方说的所有话", role="assistant"))) -> Response:
+async def create_agent(name: str = Body(default="Emohaa"),
+                       desc: str = Body(default="Emohaa是一款基于Hill助人理论的情感支持AI，拥有专业的心理咨询话术能力。能够和对方共情、安慰，并且记得对方说的所有话"),
+                       model: str = Body(default="GLM-4-Flash")) -> Response:
     memory = RawMemory()
-    assistant = AIAgent(agent_info=agent_info, memory=memory)
+    assistant = AIAgent(name=name, desc=desc, model=model, memory=memory)
     assistant.save()
-    return Response(data=assistant)
+    return Response(data=assistant.get_config())
 
 
-# @app.post("/session/create", tags=["session"])
-# async def create_session(user_info: AgentInfo = Body(...),
-#                          assistant_info: AgentInfo = Body(...)) -> Response:
-#     session = Session(history=[], user_info=user_info, assistant_info=assistant_info)
-#     session.save()
-#     return Response(data=session.to_json())
+@app.post("/agent/chat", tags=["agent"])
+async def chat_agent(agent_id: str = Body(...),
+                     user_id: str = Body(...),
+                     message: str = Body(...),
+                     stream: bool = Body(default=False)) -> Response:
+    assistant = get_assistant(agent_id)
+    resp = assistant.chat(message=UserMessage(content=message, name=user_id), stream=stream)
+    logger.debug(f"{resp=}")
 
-
-# @app.post("/session/chat", tags=["session"])
-# async def chat(session_id: str = Body(...),
-#                message: str = Body(...)) -> Response:
-#     session = get_session(session_id)
-#     agent_info = session.assistant_info
-#     memory = RawMemory(history=session.history)
-#     assistant = AIAgent(agent_info=agent_info, memory=memory)
-#     message = UserMessage(content=message)
-#     resp_message = assistant.chat(message)
-#     return Response(data=resp_message)
+    return Response(data=resp)
