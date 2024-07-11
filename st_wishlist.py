@@ -13,6 +13,7 @@ from aifori.config import DATA_DIR
 from snippets import load, dump
 import datetime
 import time
+from loguru import logger
 
 data_path = os.path.join(DATA_DIR, "adopters.jsonl")
 
@@ -44,5 +45,6 @@ if submit_button:
     item = dict(cur_time=cur_time, sent_email=sent_email, dairy=dairy, mental=mental, company=company,
                 art=art, other=other,  message=message)
     items.append(item)
+    logger.info(f"Received new item: {item}")
     dump(items, data_path)
     st.info("感谢您的反馈，我们会尽快处理您的需求！")
