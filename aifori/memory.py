@@ -28,3 +28,16 @@ class RawMemory(Memory):
     # def to_json(self) -> dict:
     #     logger.debug(f"history: {self.history}")
     #     return {"size": self.size, "history": self.history}
+
+
+
+class DBMemory(Memory):
+    agent_id:str  = Field(default="", description="The id of the agent")
+
+    def to_llm_messages(self) -> List[Message]:
+        
+        return copy.copy(self.history)
+
+    def add_message(self, message: Message) -> None:
+        self.history.append(message)
+    

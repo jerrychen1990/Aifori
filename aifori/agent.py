@@ -8,12 +8,14 @@
 '''
 
 
+import os
+from typing import List
 from loguru import logger
-from aifori.core import Agent, AgentInfo, AssistantMessage, Memory, Message, UserMessage
+from aifori.core import Agent, AgentInfo, AssistantMessage, Memory, Message, StreamAssistantMessage, StreamMessage, UserMessage
 from aifori.memory import RawMemory
 from liteai.api import chat
-from liteai.core import ModelResponse
 from snippets import load
+from zhipuai import ZhipuAI
 
 
 class AIAgent(Agent):
@@ -23,11 +25,15 @@ class AIAgent(Agent):
         self.memory = memory
         self.model = model
 
-    def _chat(self, message: UserMessage, stream=False, **kwargs) -> ModelResponse:
+    def chat(self, message: UserMessage, stream=False, **kwargs) -> Message | StreamMessage:
         history = self.memory.to_llm_messages()
         messages = history + [message]
         llm_resp = chat(model=self.model, messages=messages, stream=stream, **kwargs)
-        return llm_resp
+
+        if stream:
+            return StreamAssistantMessage(content=llm_resp.content, name=self.name)
+        else:
+            return AssistantMessage(content=llm_resp.content, name=self.name)
 
     def get_config(self):
         config = super().get_config()
@@ -38,55 +44,52 @@ class AIAgent(Agent):
     def from_config(cls, path: str):
         data = load(path)
         data["memory"] = RawMemory.model_validate(data["memory"])
-        logger.debug(f"load agent from {path} with {data}")
+        logger.debug(f"load agent from {path}")
         return cls(**data)
 
-    def remember(self, message: Message | ModelResponse):
-        if isinstance(message, Message):
+    def remember(self, message: Message | StreamMessage):
+        if isinstance(StreamMessage):
+            def _gen():
+                acc = ""
+                for chunk in message.content:
+                    yield chunk
+                    acc += chunk
+                self.memory.add_message(AssistantMessage(content=acc, name=self.name))
+            message.content = _gen()
+        else:
             self.memory.add_message(message)
-        if isinstance(message, ModelResponse):
-            if isinstance(message.content, str):
-                self.memory.add_message(AssistantMessage(content=message.content, name=self.name))
-            else:
-                def _gen():
-                    acc = ""
-                    for chunk in message.content:
-                        yield chunk
-                        acc += chunk
-                    self.memory.add_message(AssistantMessage(content=acc, name=self.name))
-
-                return ModelResponse(content=_gen(), image=message.image)
         return message
 
 
 class HumanAgent(Agent):
     pass
 
-# def call_lingxin(user_info: AgentInfo, agent_info: AgentInfo, model: str, messages: List[str], stream=True):
-#     api_key = os.environ["ZHIPU_API_KEY"]
-#     client = ZhipuAI(api_key=api_key)  # 填写您自己的APIKey
-#     meta = dict(user_info=user_info.desc, user_name=user_info.name, bot_info=agent_info.desc, bot_name=agent_info.name)
-#     logger.info(f"calling lingxin with: {meta=} {model=} {messages=}, {api_key=}")
 
-#     response = client.chat.completions.create(
-#         model=model,  # 填写需要调用的模型名称
-#         meta=meta,
-#         messages=messages,
-#         stream=stream
-#     )
-#     if not stream:
-#         return response.choices[0].message.content
-#     else:
-#         def _gen():
-#             acc = ""
-#             for chunk in response:
-#                 # print(chunk)
-#                 resp = chunk.choices[0].delta.content if chunk.choices[0].delta else ""
-#                 if resp:
-#                     yield resp
-#                     acc += resp
-#             logger.debug(f"streaming response :{acc}")
-#         return _gen()
+def call_lingxin(user_info: AgentInfo, agent_info: AgentInfo, model: str, messages: List[str], stream=True):
+    api_key = os.environ["ZHIPU_API_KEY"]
+    client = ZhipuAI(api_key=api_key)  # 填写您自己的APIKey
+    meta = dict(user_info=user_info.desc, user_name=user_info.name, bot_info=agent_info.desc, bot_name=agent_info.name)
+    logger.info(f"calling lingxin with: {meta=} {model=} {messages=}, {api_key=}")
+
+    response = client.chat.completions.create(
+        model=model,  # 填写需要调用的模型名称
+        meta=meta,
+        messages=messages,
+        stream=stream
+    )
+    if not stream:
+        return response.choices[0].message.content
+    else:
+        def _gen():
+            acc = ""
+            for chunk in response:
+                # print(chunk)
+                resp = chunk.choices[0].delta.content if chunk.choices[0].delta else ""
+                if resp:
+                    yield resp
+                    acc += resp
+            logger.debug(f"streaming response :{acc}")
+        return _gen()
 
 
 # def chat_llm(user_info: AgentInfo, agent_info: AgentInfo, model: str, messages: List[str], stream=True, **kwargs):

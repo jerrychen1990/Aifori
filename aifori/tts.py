@@ -16,13 +16,11 @@ from aifori.config import *
 from snippets import jdumps
 
 
-def minimax_tts(text, tgt_path, model="speech-01-turbo",
-                stream=False, voice_id="male-qn-qingse", speed=1, pitch=0):
+def minimax_tts(text: str, model="speech-01-turbo", version="t2a_v2", append=False,
+                stream=False, voice_id="tianxin_xiaoling", speed=1, pitch=0) -> bytes:
     group_id = os.environ["MINIMAX_GROUP_ID"]
     api_key = os.environ["MINIMAX_API_KEY"]
-    # print(group_id)
-    # print(api_key)
-    url = f"https://api.minimax.chat/v1/t2a_v2?GroupId={group_id}"
+    url = f"https://api.minimax.chat/v1/{version}?GroupId={group_id}"
 
     payload = {
         "model": model,
@@ -33,6 +31,9 @@ def minimax_tts(text, tgt_path, model="speech-01-turbo",
             "speed": speed,
             "vol": 1,
             "pitch": pitch
+        },
+        "pronunciation_dict": {
+            "tone": ["aifori/(ai4)(fo)(ri)"]
         },
         "audio_setting": {
             "sample_rate": 32000,
@@ -45,10 +46,9 @@ def minimax_tts(text, tgt_path, model="speech-01-turbo",
         'Authorization': f'Bearer {api_key}',
         'Content-Type': 'application/json'
     }
-    # print(payload)
-    logger.info(f"calling minimax tts with payload: {jdumps(payload)}")
-
+    logger.debug(f"calling minimax tts with payload: {jdumps(payload)}")
     response = requests.request("POST", url, headers=headers, stream=stream, json=payload)
+    logger.debug(f"{response.status_code=}")
     response.raise_for_status()
     if not stream:
         data = response.json()
@@ -57,15 +57,12 @@ def minimax_tts(text, tgt_path, model="speech-01-turbo",
         if "data" not in data:
             logger.exception(data)
             raise Exception(data)
-        audio_value = bytes.fromhex(data['data']['audio'])
-        with open(tgt_path, 'wb') as f:
-            f.write(audio_value)
-        return tgt_path
+        audio_bytes = bytes.fromhex(data['data']['audio'])
+        return audio_bytes
     else:
         def gen():
             for chunk in (response.raw):
                 if chunk:
-                    # print(chunk)
                     if chunk[:5] == b'data:':
                         data = json.loads(chunk[5:])
                         if "data" in data and "extra_info" not in data:
@@ -75,9 +72,6 @@ def minimax_tts(text, tgt_path, model="speech-01-turbo",
         return gen()
 
 
-# get md5 of text
-
-
 def get_md5(text):
     import hashlib
     md5 = hashlib.md5()
@@ -85,14 +79,21 @@ def get_md5(text):
     return md5.hexdigest()
 
 
-def tts(text, provider="minimax", tgt_path=None, **kwargs):
+def tts(text, provider="minimax", tgt_path=None, stream=False, **kwargs):
     if not tgt_path:
         tgt_path = os.path.join(VOICE_DIR, provider, get_md5(text) + ".mp3")
     os.makedirs(os.path.dirname(tgt_path), exist_ok=True)
-    logger.info(f"{provider=}, {kwargs=}")
+    logger.debug(f"{provider=}, {kwargs=}")
     if provider == "minimax":
-        minimax_tts(text, tgt_path=tgt_path, **kwargs)
-    return tgt_path
+        bytes = minimax_tts(text, stream=stream, **kwargs)
+        if not stream:
+            with open(tgt_path, "wb") as f:
+                f.write(bytes)
+            return tgt_path
+        else:
+            return bytes
+    else:
+        raise Exception(f"Unknown provider: {provider}")
 
 
 if __name__ == "__main__":

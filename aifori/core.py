@@ -10,7 +10,7 @@
 
 from abc import abstractmethod
 import os
-from typing import List
+from typing import Iterable, List
 from pydantic import BaseModel, Field
 from aifori.config import AGENT_DIR, SESSION_DIR
 from liteai.core import Message as LMessage
@@ -26,12 +26,17 @@ class Message(LMessage):
 class UserMessage(Message):
     role: str = "user"
 
-    # class Config:
-    #     arbitrary_types_allowed = True
-
 
 class AssistantMessage(Message):
     role: str = "assistant"
+
+
+class StreamMessage(Message):
+    content: Iterable[str] = Field(description="stream content")
+
+
+class StreamAssistantMessage(StreamMessage, AssistantMessage):
+    pass
 
 
 class AgentInfo(BaseModel):
@@ -51,23 +56,24 @@ class Memory(BaseModel):
     #     raise NotImplementedError
 
 
+class Voice(BaseModel):
+    voice_file: str = Field(description="voice file path")
+    content: bytes = Field(description="voice content")
+
+
 class Agent:
     def __init__(self, name: str, desc: str, id: str = None):
         self.id = id if id else str(uuid.uuid4())
         self.name = name
         self.desc = desc
 
-    def _chat(self, message: Message, stream=False) -> Message:
+    @abstractmethod
+    def chat(self, message: Message, stream=False, **kwargs) -> Message | StreamMessage:
         raise NotImplementedError
 
     @abstractmethod
-    def chat(self, message: Message, stream=False, do_remember=True, **kwargs):
-        resp_message = self._chat(message, stream, **kwargs)
-        if do_remember:
-            logger.debug(f"remember message {message} and {resp_message}")
-            self.remember(message)
-            resp_message = self.remember(resp_message)
-        return resp_message
+    def speak(self, message: Message, stream=False, **kwargs) -> Voice:
+        raise NotImplementedError
 
     @abstractmethod
     def remember(self, message):

@@ -173,3 +173,6 @@ test.ipynb
 sessions/
 data/adopters.jsonl
 agents/
+output/
+data/demo
+record/adopters.jsonl

@@ -1,12 +1,13 @@
 from fastapi import Body, FastAPI
+from fastapi.responses import StreamingResponse
 from aifori.agent import AIAgent
+from aifori.tts import tts as tts_api
 from aifori.core import UserMessage
 from pydantic import BaseModel, Field
 from typing import Any
 
 from aifori.api import get_assistant
 from aifori.memory import RawMemory
-from loguru import logger
 
 app = FastAPI()
 
@@ -49,9 +50,32 @@ async def create_agent(name: str = Body(default="Emohaa"),
 async def chat_agent(agent_id: str = Body(...),
                      user_id: str = Body(...),
                      message: str = Body(...),
-                     stream: bool = Body(default=False)) -> Response:
+                     stream: bool = Body(default=False),
+                     do_remember: bool = Body(default=True)) -> Response:
     assistant = get_assistant(agent_id)
-    resp = assistant.chat(message=UserMessage(content=message, name=user_id), stream=stream)
-    logger.debug(f"{resp=}")
+    user_message = UserMessage(content=message, name=user_id)
+    assistant_message = assistant.chat(message=user_message,  stream=stream)
+    if do_remember:
+        assistant.remember(user_message)
+        assistant.remember(assistant_message)
+    if stream:
+        pass
+    else:
+        return Response(data=assistant_message)
 
-    return Response(data=resp)
+
+@app.post("/agent/speak", tags=["agent"])
+async def speak_agent(agent_id: str = Body(...),
+                      message: str = Body(...),
+                      stream: bool = Body(default=False),
+                      tts_config: dict = Body(default=dict())) -> Response:
+    assistant = get_assistant(agent_id)
+
+    pass
+
+
+@app.post("/model/tts", tags=["model"])
+async def tts(message: str = Body(default="你好,我是aifori"),
+              tts_config: dict = Body(default=dict())) -> StreamingResponse:
+    resp = tts_api(text=message, stream=True, **tts_config)
+    return StreamingResponse(resp, media_type="audio/wav")
