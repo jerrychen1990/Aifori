@@ -5,6 +5,9 @@ from loguru import logger
 AIFORI_HOME = os.getenv("AIFORI_HOME", os.path.abspath(os.path.dirname(curdir)))
 logger.info(f"AIFORI_HOME: {AIFORI_HOME}")
 
+LOG_HOME = os.getenv("AIFORI_LOG_HOME", os.path.join(AIFORI_HOME, "logs"))
+os.makedirs(LOG_HOME, exist_ok=True)
+
 VOICE_DIR = os.path.join(AIFORI_HOME, "voices")
 os.makedirs(VOICE_DIR, exist_ok=True)
 

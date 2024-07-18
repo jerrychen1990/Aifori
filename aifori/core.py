@@ -20,7 +20,7 @@ from loguru import logger
 
 
 class Message(LMessage):
-    name: str = Field(description="user name")
+    id: str = Field(description="agent的id")
 
 
 class UserMessage(Message):
@@ -35,8 +35,8 @@ class StreamMessage(Message):
     content: Iterable[str] = Field(description="stream content")
 
 
-class StreamAssistantMessage(StreamMessage, AssistantMessage):
-    pass
+class StreamAssistantMessage(StreamMessage):
+    role: str = "assistant"
 
 
 class AgentInfo(BaseModel):
@@ -57,8 +57,8 @@ class Memory(BaseModel):
 
 
 class Voice(BaseModel):
-    voice_file: str = Field(description="voice file path")
-    content: bytes = Field(description="voice content")
+    voice_file: str = Field(description="voice file path", default=None)
+    content: Iterable[bytes] = Field(description="voice content")
 
 
 class Agent:

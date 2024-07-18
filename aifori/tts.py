@@ -10,6 +10,8 @@
 
 import json
 import os
+import subprocess
+from typing import Iterable
 import requests
 from loguru import logger
 from aifori.config import *
@@ -32,9 +34,9 @@ def minimax_tts(text: str, model="speech-01-turbo", version="t2a_v2", append=Fal
             "vol": 1,
             "pitch": pitch
         },
-        "pronunciation_dict": {
-            "tone": ["aifori/(ai4)(fo)(ri)"]
-        },
+        # "pronunciation_dict": {
+        #     "tone": ["aifori/(ai4)(fo)(ri)"]
+        # },
         "audio_setting": {
             "sample_rate": 32000,
             "bitrate": 128000,
@@ -94,6 +96,35 @@ def tts(text, provider="minimax", tgt_path=None, stream=False, **kwargs):
             return bytes
     else:
         raise Exception(f"Unknown provider: {provider}")
+
+
+mpv_process = None
+
+
+def get_play_process():
+    global mpv_process
+    if not mpv_process:
+        mpv_command = ["mpv", "--no-cache", "--no-terminal", "--", "fd://0"]
+        mpv_process = subprocess.Popen(
+            mpv_command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    return mpv_process
+
+
+def play_voice(voice_stream: Iterable[bytes]):
+
+    process = get_play_process()
+
+    audio = b""
+    for chunk in voice_stream:
+        if chunk is not None and chunk != b'\n':
+            decoded_hex = chunk
+            process.stdin.write(decoded_hex)  # type: ignore
+            process.stdin.flush()
+            audio += decoded_hex
 
 
 if __name__ == "__main__":

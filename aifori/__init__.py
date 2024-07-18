@@ -10,12 +10,8 @@
 
 from snippets import set_logger
 from dotenv import load_dotenv
+from aifori.config import LOG_HOME
 
 
-set_logger("DEV", __name__, "./logs")
+set_logger("DEV", __name__, LOG_HOME)
 load_dotenv()
-
-
-# for k, v in st.secrets.items():
-#     logger.info(f"set env {k}={v}")
-#     os.environ[k] = v
