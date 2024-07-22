@@ -10,3 +10,4 @@ liteai
 python-snippets
 streamlit
 pelican
+mem0ai

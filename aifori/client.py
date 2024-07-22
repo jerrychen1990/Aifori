@@ -8,9 +8,11 @@
 '''
 
 
+import copy
 import json
+from typing import Tuple
 import requests
-from aifori.core import AssistantMessage, StreamAssistantMessage
+from aifori.core import AssistantMessage, Message, StreamAssistantMessage, Voice
 from loguru import logger
 
 from aifori.tts import play_voice
@@ -38,13 +40,17 @@ class AiForiClient(object):
         assert resp["status"].upper() == "OK"
 
     def create_agent(self, agent_id: str, name: str, desc: str, model: str, voice_config: dict = dict()) -> dict:
-        data = {'agent_id': agent_id, 'name': name, 'desc': desc, 'model': model, 'voice_config': voice_config}
+        data = {'id': agent_id, 'name': name, 'desc': desc, 'model': model, 'voice_config': voice_config}
         resp = self._do_request('/agent/create', json=data)
         return resp
 
-    def chat(self, agent_id: str, user_id: str, message: str, do_remember=True, stream=True) -> StreamAssistantMessage | AssistantMessage:
-        data = {'id': agent_id,
-                'user_id': user_id, 'message': message, 'do_remember': do_remember}
+    def delete_agent(self, agent_id: str) -> dict:
+        data = {'id': agent_id}
+        resp = self._do_request('/agent/delete', json=data)
+        return resp
+
+    def chat(self,  stream=True, **kwargs) -> StreamAssistantMessage | AssistantMessage:
+        data = copy.copy(kwargs)
         if stream:
             resp = self._do_request('/agent/chat_stream', json=data, stream=True).iter_lines()
             assistant_id = json.loads(next(resp).decode('utf-8'))["assistant_id"]
@@ -57,19 +63,26 @@ class AiForiClient(object):
                         # logger.debug(f"{chunk=}")
                         yield chunk
 
-            return StreamAssistantMessage(id=assistant_id, content=gen())
+            return StreamAssistantMessage(user_id=assistant_id, content=gen())
         else:
             resp = self._do_request('/agent/chat', json=data)
             return AssistantMessage.model_validate(resp)
 
     def speak(self, agent_id: str, message: str, tts_config=dict(), max_word=None):
         message = message if max_word is None else message[:max_word]
-        voice = self._do_request('/agent/speak_stream', json={'id': agent_id,
+        voice = self._do_request('/agent/speak_stream', json={'agent_id': agent_id,
                                                               'message': message, "tts_config": tts_config}, stream=True)
         logger.debug(f"{voice=}")
         play_voice(voice)
         return voice
 
-    def chat_and_speak(self, agent_id: str, user_id: str, message: str, tts_config=dict(), do_remember=True, max_word=None) -> AssistantMessage:
-        message = self.chat(agent_id, user_id, message, stream=False, do_remember=do_remember)
-        self.speak(agent_id, message=message.content, tts_config=tts_config, max_word=max_word)
+    def clear_session(self, session_id: str) -> dict:
+        resp = self._do_request('/session/clear', json={'session_id': session_id})
+        return resp
+
+    def chat_and_speak(self, session_id: str, agent_id: str, user_id: str, message: str, tts_config=dict(), do_remember=True, max_word=None) -> Tuple[AssistantMessage, Voice]:
+        resp_message: Message = self.chat(agent_id=agent_id, user_id=user_id, message=message,
+                                          stream=False, do_remember=do_remember, session_id=session_id)
+        logger.debug(f"{resp_message=}")
+        voice = self.speak(agent_id, message=resp_message.content, tts_config=tts_config, max_word=max_word)
+        return resp_message, voice

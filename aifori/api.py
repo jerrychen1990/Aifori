@@ -21,5 +21,15 @@ def get_session(session_id: str) -> Session:
 
 def get_assistant(assistant_id: str) -> AIAgent:
     config_path = os.path.join(AGENT_DIR, assistant_id+".json")
+    if not os.path.exists(config_path):
+        logger.info(f"Assistant config file not found: {config_path}")
+        return None
     assistant = AIAgent.from_config(config_path)
     return assistant
+
+
+def delete_assistant(assistant_id: str):
+    config_path = os.path.join(AGENT_DIR, assistant_id+".json")
+    if os.path.exists(config_path):
+        logger.info(f"Delete assistant config file: {config_path}")
+        os.remove(config_path)

@@ -20,7 +20,7 @@ from loguru import logger
 
 
 class Message(LMessage):
-    id: str = Field(description="agent的id")
+    user_id: str = Field(description="agent的id")
 
 
 class UserMessage(Message):

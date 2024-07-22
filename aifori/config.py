@@ -51,3 +51,13 @@ CHARACTER_MAP = {
         "desc": "一个霸气、自信、帅气的男生，声音低沉而有力。"
     }
 }
+
+MEM_CONFIG = {
+    "vector_store": {
+        "provider": "qdrant",
+        "config": {
+            "host": "localhost",
+            "port": 6333,
+        }
+    },
+}

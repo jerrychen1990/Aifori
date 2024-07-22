@@ -10,9 +10,16 @@
 import copy
 from typing import List
 
+
+from aifori.config import MEM_CONFIG
 from aifori.core import Memory, Message, Memory
 from liteai.core import Message
 from pydantic import Field
+from loguru import logger
+import mem0
+
+
+_MEM = mem0.Memory.from_config(MEM_CONFIG)
 
 
 class RawMemory(Memory):
@@ -30,14 +37,28 @@ class RawMemory(Memory):
     #     return {"size": self.size, "history": self.history}
 
 
-
 class DBMemory(Memory):
-    agent_id:str  = Field(default="", description="The id of the agent")
+    agent_id: str = Field(description="The id of the agent")
+    size: int = Field(default=10, description="The size of the memory")
 
     def to_llm_messages(self) -> List[Message]:
-        
-        return copy.copy(self.history)
+        return None
 
-    def add_message(self, message: Message) -> None:
-        self.history.append(message)
-    
+
+class Mem0Memory(Memory):
+    agent_id: str = Field(description="The id of the agent")
+    size: int = Field(default=10, description="The size of the memory")
+
+    def to_llm_messages(self) -> List[Message]:
+        messages = _MEM.get_all(agent_id=self.agent_id, limit=self.size)
+
+        logger.debug(f"{messages=}")
+        return messages
+
+    def add_message(self, message: Message, to_id: str) -> None:
+        user_id, agent_id = message.user_id, to_id
+        if message.role != "user":
+            user_id, agent_id = agent_id, user_id
+        logger.debug(f"add message {user_id=}, {agent_id=} {message.content=}")
+        rs = _MEM.add(message.content, user_id=user_id, agent_id=agent_id)
+        logger.info(rs)

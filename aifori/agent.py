@@ -12,37 +12,41 @@ import copy
 import os
 from typing import List
 from loguru import logger
-from aifori.core import Agent, AgentInfo, AssistantMessage, Memory, Message, StreamAssistantMessage, StreamMessage, UserMessage, Voice
-from aifori.memory import RawMemory
+from aifori.core import Agent, AgentInfo, AssistantMessage, Message, StreamAssistantMessage, StreamMessage, UserMessage, Voice
+from aifori.memory import DBMemory, RawMemory
 from aifori.tts import tts
 from liteai.api import chat
+from aifori.session import SESSION_MANAGER
 from snippets import load
 from zhipuai import ZhipuAI
 
 
 class AIAgent(Agent):
-    def __init__(self, model: str, memory: Memory, voice_config: dict = {}, **kwargs):
+    def __init__(self, model: str, voice_config: dict = {}, **kwargs):
         super().__init__(**kwargs)
         self.role = "assistant"
-        self.memory = memory
+        self.memory = DBMemory(agent_id=self.id)
         self.model = model
         self.voice_config = voice_config
 
-    def chat(self, message: UserMessage, stream=False, **kwargs) -> Message | StreamMessage:
-        history = self.memory.to_llm_messages()
+    def chat(self, message: UserMessage, stream=False, session_id=None, **kwargs) -> Message | StreamMessage:
+        # history = self.memory.to_llm_messages()
+        history = SESSION_MANAGER.get_history(related_ids=[self.id, message.user_id], session_id=session_id)
+
         system = f"""
 你是一个善解人意的聊天机器人，你的名字叫:{self.name}
 你的人设是:{self.desc}
 请简短、温和地和用户对话
 """
+
         messages = [dict(role="system", content=system)] + history + [message]
 
         llm_resp = chat(model=self.model, messages=messages, stream=stream, **kwargs)
 
         if stream:
-            return StreamAssistantMessage(content=llm_resp.content, id=self.id)
+            return StreamAssistantMessage(content=llm_resp.content, user_id=self.id)
         else:
-            return AssistantMessage(content=llm_resp.content, id=self.id)
+            return AssistantMessage(content=llm_resp.content, user_id=self.id)
 
     def speak(self, message: Message | str, stream=True, **kwargs) -> Voice:
         speak_config = copy.copy(self.voice_config)
@@ -58,13 +62,12 @@ class AIAgent(Agent):
 
     def get_config(self):
         config = super().get_config()
-        config.update(model=self.model, memory=self.memory)
+        config.update(model=self.model)
         return config
 
     @classmethod
     def from_config(cls, path: str):
         data = load(path)
-        data["memory"] = RawMemory.model_validate(data["memory"])
         logger.debug(f"load agent from {path}")
         return cls(**data)
 
@@ -75,8 +78,8 @@ class AIAgent(Agent):
                 for chunk in message.content:
                     yield chunk
                     acc += chunk
-                self.memory.add_message(AssistantMessage(content=acc, id=self.id))
-            return StreamMessage(content=_gen(), id=self.id, role=self.role)
+                self.memory.add_message(AssistantMessage(content=acc, user_id=self.id))
+            return StreamMessage(content=_gen(), user_id=self.id, role=self.role)
         else:
             self.memory.add_message(message)
             return message

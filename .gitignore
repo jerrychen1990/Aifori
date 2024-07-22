@@ -177,3 +177,5 @@ output/
 data/demo
 record/adopters.jsonl
 output.mp3
+qdrant_storage/
+db/aifori.db
