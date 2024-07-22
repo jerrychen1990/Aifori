@@ -13,5 +13,5 @@ from dotenv import load_dotenv
 from aifori.config import LOG_HOME
 
 
-set_logger("DEV", __name__, LOG_HOME)
+set_logger("DEV", __name__, log_dir=LOG_HOME, show_process=True)
 load_dotenv()

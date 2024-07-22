@@ -10,7 +10,7 @@
 
 import copy
 import json
-from typing import Tuple
+from typing import Callable, List, Tuple
 import requests
 from aifori.core import AssistantMessage, Message, StreamAssistantMessage, Voice
 from loguru import logger
@@ -54,7 +54,7 @@ class AiForiClient(object):
         if stream:
             resp = self._do_request('/agent/chat_stream', json=data, stream=True).iter_lines()
             assistant_id = json.loads(next(resp).decode('utf-8'))["assistant_id"]
-            logger.debug(f"{assistant_id=}")
+            # logger.debug(f"{assistant_id=}")
 
             def gen():
                 for chunk in resp:
@@ -68,21 +68,24 @@ class AiForiClient(object):
             resp = self._do_request('/agent/chat', json=data)
             return AssistantMessage.model_validate(resp)
 
-    def speak(self, agent_id: str, message: str, tts_config=dict(), max_word=None):
+    def speak(self, agent_id: str, message: str, tts_config=dict(), max_word=None, callbacks: List[Tuple[Callable, dict]] = [play_voice, {}]):
         message = message if max_word is None else message[:max_word]
         voice = self._do_request('/agent/speak_stream', json={'agent_id': agent_id,
                                                               'message': message, "tts_config": tts_config}, stream=True)
-        logger.debug(f"{voice=}")
-        play_voice(voice)
+        # logger.debug(f"{voice=}")
+        for callback, kwargs in callbacks:
+            logger.debug(f"calling {callback.__name__}")
+            callback(voice, **kwargs)
         return voice
 
     def clear_session(self, session_id: str) -> dict:
         resp = self._do_request('/session/clear', json={'session_id': session_id})
         return resp
 
-    def chat_and_speak(self, session_id: str, agent_id: str, user_id: str, message: str, tts_config=dict(), do_remember=True, max_word=None) -> Tuple[AssistantMessage, Voice]:
+    def chat_and_speak(self, session_id: str, agent_id: str, user_id: str, message: str, tts_config=dict(),
+                       do_remember=True, max_word=None, speak_callbacks: List[Tuple[Callable, dict]] = [play_voice, {}]) -> Tuple[AssistantMessage, Voice]:
         resp_message: Message = self.chat(agent_id=agent_id, user_id=user_id, message=message,
                                           stream=False, do_remember=do_remember, session_id=session_id)
         logger.debug(f"{resp_message=}")
-        voice = self.speak(agent_id, message=resp_message.content, tts_config=tts_config, max_word=max_word)
+        voice = self.speak(agent_id, message=resp_message.content, tts_config=tts_config, max_word=max_word, callbacks=speak_callbacks)
         return resp_message, voice

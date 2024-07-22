@@ -115,9 +115,7 @@ def get_play_process():
 
 
 def play_voice(voice_stream: Iterable[bytes]):
-
     process = get_play_process()
-
     audio = b""
     for chunk in voice_stream:
         if chunk is not None and chunk != b'\n':
@@ -125,6 +123,16 @@ def play_voice(voice_stream: Iterable[bytes]):
             process.stdin.write(decoded_hex)  # type: ignore
             process.stdin.flush()
             audio += decoded_hex
+
+
+def dump_voice(voice_stream: Iterable[bytes], path: str):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as f:
+        for chunk in voice_stream:
+            if chunk is not None and chunk != b'\n':
+                decoded_hex = chunk
+                f.write(decoded_hex)
+    return path
 
 
 if __name__ == "__main__":

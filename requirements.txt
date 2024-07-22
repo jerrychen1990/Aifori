@@ -11,3 +11,4 @@ python-snippets
 streamlit
 pelican
 mem0ai
+sqlalchemy
