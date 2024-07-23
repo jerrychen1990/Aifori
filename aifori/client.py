@@ -44,9 +44,19 @@ class AiForiClient(object):
         resp = self._do_request('/agent/create', json=data)
         return resp
 
+    def create_user(self, user_id: str, name: str, desc: str) -> dict:
+        data = {'id': user_id, 'name': name, 'desc': desc}
+        resp = self._do_request('/user/create', json=data)
+        return resp
+
     def delete_agent(self, agent_id: str) -> dict:
         data = {'id': agent_id}
         resp = self._do_request('/agent/delete', json=data)
+        return resp
+
+    def delete_user(self, user_id: str) -> dict:
+        data = {'id': user_id}
+        resp = self._do_request('/user/delete', json=data)
         return resp
 
     def chat(self,  stream=True, **kwargs) -> StreamAssistantMessage | AssistantMessage:
@@ -68,7 +78,7 @@ class AiForiClient(object):
             resp = self._do_request('/agent/chat', json=data)
             return AssistantMessage.model_validate(resp)
 
-    def speak(self, agent_id: str, message: str, tts_config=dict(), max_word=None, callbacks: List[Tuple[Callable, dict]] = [play_voice, {}]):
+    def speak(self, agent_id: str, message: str, tts_config=dict(), max_word=None, callbacks: List[Tuple[Callable, dict]] = [[play_voice, {}]]):
         message = message if max_word is None else message[:max_word]
         voice = self._do_request('/agent/speak_stream', json={'agent_id': agent_id,
                                                               'message': message, "tts_config": tts_config}, stream=True)
@@ -83,7 +93,7 @@ class AiForiClient(object):
         return resp
 
     def chat_and_speak(self, session_id: str, agent_id: str, user_id: str, message: str, tts_config=dict(),
-                       do_remember=True, max_word=None, speak_callbacks: List[Tuple[Callable, dict]] = [play_voice, {}]) -> Tuple[AssistantMessage, Voice]:
+                       do_remember=True, max_word=None, speak_callbacks: List[Tuple[Callable, dict]] = [[play_voice, {}]]) -> Tuple[AssistantMessage, Voice]:
         resp_message: Message = self.chat(agent_id=agent_id, user_id=user_id, message=message,
                                           stream=False, do_remember=do_remember, session_id=session_id)
         logger.debug(f"{resp_message=}")

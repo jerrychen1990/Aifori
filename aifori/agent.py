@@ -17,7 +17,6 @@ from aifori.memory import DBMemory, RawMemory
 from aifori.tts import tts
 from liteai.api import chat
 from aifori.session import SESSION_MANAGER
-from snippets import load
 from zhipuai import ZhipuAI
 
 
@@ -28,16 +27,24 @@ class AIAgent(Agent):
         self.memory = DBMemory(agent_id=self.id)
         self.model = model
         self.voice_config = voice_config
+        self.system_template = """你是一个善解人意的聊天机器人
+你的名字叫:{agent_name}
+你的人设是:{agent_desc}
+你在和{user_name}聊天
+{user_name}的人设:{user_desc}
+请遵循以下规则聊天
+请简短、温和地和用户对话"""
+
+    def _build_system(self, user_id: str) -> str:
+        user = HumanAgent.from_config(id=user_id)
+
+        system = self.system_template.format(agent_name=self.name, agent_desc=self.desc, user_name=user.name, user_desc=user.desc)
+        logger.debug(system)
+        return system
 
     def chat(self, message: UserMessage, stream=False, session_id=None, **kwargs) -> Message | StreamMessage:
-        # history = self.memory.to_llm_messages()
         history = SESSION_MANAGER.get_history(related_ids=[self.id, message.user_id], session_id=session_id)
-
-        system = f"""
-你是一个善解人意的聊天机器人，你的名字叫:{self.name}
-你的人设是:{self.desc}
-请简短、温和地和用户对话
-"""
+        system = self._build_system(user_id=message.user_id)
 
         messages = [dict(role="system", content=system)] + history + [message]
 
@@ -65,12 +72,6 @@ class AIAgent(Agent):
         config.update(model=self.model)
         return config
 
-    @classmethod
-    def from_config(cls, path: str):
-        data = load(path)
-        logger.debug(f"load agent from {path}")
-        return cls(**data)
-
     def remember(self, message: Message | StreamMessage):
         if isinstance(message, StreamMessage):
             def _gen():
@@ -86,7 +87,9 @@ class AIAgent(Agent):
 
 
 class HumanAgent(Agent):
-    pass
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.role = "user"
 
 
 def call_lingxin(user_info: AgentInfo, agent_info: AgentInfo, model: str, messages: List[str], stream=True):

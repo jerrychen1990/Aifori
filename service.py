@@ -2,14 +2,14 @@ from functools import wraps
 import json
 from fastapi import Body, FastAPI
 from fastapi.responses import StreamingResponse
-from aifori.agent import AIAgent
+from aifori.agent import AIAgent, HumanAgent
 from aifori.session import SESSION_MANAGER
 from aifori.tts import tts as tts_api
 from aifori.core import AssistantMessage, UserMessage
 from pydantic import BaseModel, Field
 from typing import Any
 
-from aifori.api import delete_assistant, get_assistant
+import aifori.api as api
 from loguru import logger
 from snippets import set_logger
 
@@ -33,15 +33,15 @@ class Response(BaseModel):
 
 
 def exception2resp(e: Exception) -> Response:
-    resp = Response(code=500, msg="server internal error", data=str(e))
+    resp = Response(code=500, msg=str(e), data=None)
     return resp
 
 
 def try_wrapper(func):
     @wraps(func)
-    def wrapped(*args, **kwargs):
+    async def wrapped(*args, **kwargs):
         try:
-            return func(*args, **kwargs)
+            return await func(*args, **kwargs)
         except Exception as e:
             logger.exception(e)
             return exception2resp(e)
@@ -54,18 +54,17 @@ async def health() -> Response:
 
 
 @app.post("/agent/create", tags=["agent"], description="创建一个Agent")
-# @try_wrapper
+@try_wrapper
 async def create_agent(
         id: str = Body(default=None, description="Agent的ID,唯一键，如果不传则自动生成", examples=["test_agent"]),
         name: str = Body(default="Aifori", description="Agent的名字", example="Aifori"),
         desc: str = Body(default="Aifori是一款基于Hill助人理论的情感支持AI，拥有专业的心理咨询话术能力。能够和对方共情、安慰，并且记得对方说的所有话", description="Agent的描述"),
-        model: str = Body(default="GLM-4-Flash", description="Agent使用的模型", example="GLM-4-Flash"),) -> Response:
-    # memory = RawMemory()
-    if id:
-        assistant = get_assistant(id)
-        if assistant:
-            raise Exception(f"agent:{id} already exists")
-    # logger.debug(f"{id=}")
+        model: str = Body(default="GLM-4-Flash", description="Agent使用的模型", example="GLM-4-Flash")) -> Response:
+    try:
+        assistant = api.get_assistant(id)
+        raise Exception(f"agent:{id} already exists")
+    except Exception as e:
+        pass
 
     assistant = AIAgent(name=name, desc=desc, model=model, id=id)
     assistant.save()
@@ -73,29 +72,59 @@ async def create_agent(
 
 
 @app.post("/agent/get", tags=["agent"], description="获取一个Agent")
-# @try_wrapper
+@try_wrapper
 async def get_agent(id: str = Body(description="Agent的ID,唯一键", examples=["test_agent"], embed=True)) -> Response:
-    assistant = get_assistant(id)
+    assistant = api.get_assistant(id)
     if not assistant:
         raise Exception(f"agent:{id} not found")
     return Response(data=assistant.get_config())
 
 
 @app.post("/agent/delete", tags=["agent"], description="删除一个Agent")
-# @try_wrapper
+@try_wrapper
 async def delete_agent(id: str = Body(description="Agent的ID,唯一键", examples=["test_agent"], embed=True)) -> Response:
-    delete_assistant(id)
+    AIAgent.delete(id)
+    return Response(data=dict(status="ok"))
+
+
+@app.post("/user/create", tags=["user"], description="创建一个人类用户")
+@try_wrapper
+async def create_user(
+        id: str = Body(default=None, description="Agent的ID,唯一键，如果不传则自动生成", examples=["test_agent"]),
+        name: str = Body(default="Aifori", description="Agent的名字", example="Aifori"),
+        desc: str = Body(default="Aifori是一款基于Hill助人理论的情感支持AI，拥有专业的心理咨询话术能力。能够和对方共情、安慰，并且记得对方说的所有话", description="Agent的描述")) -> Response:
+    try:
+        user = get_user(id)
+        raise Exception(f"user:{id} already exists")
+    except Exception as e:
+        pass
+    user = HumanAgent(name=name, desc=desc, id=id)
+    user.save()
+    return Response(data=user.get_config())
+
+
+@app.post("/user/get", tags=["user"], description="获取一个人类用户")
+@try_wrapper
+async def get_user(id: str = Body(description="USER的ID,唯一键", examples=["test_user"], embed=True)) -> Response:
+    user = api.get_user(id)
+    return Response(data=user.get_config())
+
+
+@app.post("/user/delete", tags=["user"], description="删除一个人类用户")
+@try_wrapper
+async def delete_user(id: str = Body(description="USER的ID,唯一键", examples=["test_user"], embed=True)) -> Response:
+    HumanAgent.delete(id)
     return Response(data=dict(status="ok"))
 
 
 @app.post("/agent/chat", tags=["agent"], description="和Agent进行对话, 批式")
-# @try_wrapper
+@try_wrapper
 async def chat_agent(agent_id: str = Body(description="Agent的ID,唯一键", examples=["test_agent"]),
                      user_id: str = Body(description="用户的ID,唯一键", examples=["test_user"]),
-                     session_id: str = Body(default=None, description="对话的ID,唯一键"),
+                     session_id: str = Body(description="对话的ID,唯一键", examples=["test_session"]),
                      message: str = Body(description="用户发送的消息", examples=["你好呀，你叫什么名字？"]),
                      do_remember: bool = Body(default=True, description="Agent是否记忆这轮对话")) -> Response:
-    assistant = get_assistant(agent_id)
+    assistant = api.get_assistant(agent_id)
     if not assistant:
         raise Exception(f"agent:{agent_id} not found")
     user_message = UserMessage(content=message, user_id=user_id)
@@ -108,7 +137,7 @@ async def chat_agent(agent_id: str = Body(description="Agent的ID,唯一键", ex
 
 
 @app.post("/agent/chat_stream", tags=["agent"], description="和Agent进行对话, 流式")
-# @try_wrapper
+@try_wrapper
 async def chat_agent_stream(agent_id: str = Body(description="Agent的ID,唯一键", examples=["test_agent"]),
                             user_id: str = Body(description="用户的ID,唯一键", examples=["test_user"]),
                             session_id: str = Body(default=None, description="对话的ID,唯一键"),
@@ -116,7 +145,7 @@ async def chat_agent_stream(agent_id: str = Body(description="Agent的ID,唯一�
                             do_remember: bool = Body(default=True, description="Agent是否记忆这轮对话")) -> StreamingResponse:
     logger.debug("agent chat stream")
 
-    assistant = get_assistant(agent_id)
+    assistant = api.get_assistant(agent_id)
     user_message = UserMessage(content=message, user_id=user_id)
     assistant_message = assistant.chat(message=user_message,  stream=True)
 
@@ -141,12 +170,12 @@ async def chat_agent_stream(agent_id: str = Body(description="Agent的ID,唯一�
 
 
 @app.post("/agent/speak_stream", tags=["agent"], description="让Agent朗读文字, 流式返回")
-# @try_wrapper
+@try_wrapper
 async def speak_agent_stream(agent_id: str = Body(description="Agent的ID,唯一键", examples=["test_agent"]),
                              message: str = Body(description="需要说出来的文字内容", examples=["你好呀，我的名字叫Aifori"]),
                              tts_config: dict = Body(default=dict(), description="tts的配置")) -> StreamingResponse:
     logger.debug(f"agent speak stream with {agent_id=}")
-    assistant = get_assistant(agent_id)
+    assistant = api.get_assistant(agent_id)
     if not assistant:
         raise Exception(f"agent:{agent_id} not found")
     voice = assistant.speak(message=message, stream=True, **tts_config)
@@ -155,7 +184,7 @@ async def speak_agent_stream(agent_id: str = Body(description="Agent的ID,唯一
 
 
 @app.post("/model/tts", tags=["model"], description="测试tts(text2speech)模型")
-# @try_wrapper
+@try_wrapper
 async def tts(message: str = Body(default="你好呀，我的名字叫Aifori", description="需要说出来的文字内容"),
               tts_config: dict = Body(default=dict(), description="tts模型的配置")) -> StreamingResponse:
     resp = tts_api(text=message, stream=True, **tts_config)

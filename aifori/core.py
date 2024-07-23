@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from aifori.config import AGENT_DIR, SESSION_DIR
 from liteai.core import Message as LMessage
 import uuid
-from snippets import dump
+from snippets import dump, load
 from loguru import logger
 
 
@@ -62,7 +62,9 @@ class Voice(BaseModel):
 
 
 class Agent:
-    def __init__(self, name: str, desc: str, id: str = None):
+    role = "UNK"
+
+    def __init__(self, name: str, desc: str, id: str = None, *args, **kwargs):
         self.id = id if id else str(uuid.uuid4())
         self.name = name
         self.desc = desc
@@ -80,14 +82,34 @@ class Agent:
         raise NotImplementedError
 
     def get_config(self):
-        return dict(name=self.name, desc=self.desc, id=self.id)
+        return dict(name=self.name, desc=self.desc, id=self.id, role=self.role)
+
+    @classmethod
+    def get_config_path(cls, id: str):
+        return os.path.join(AGENT_DIR, cls.role, f"{id}.json")
 
     def save(self):
-        agent_config_path = os.path.join(AGENT_DIR, f"{self.id}.json")
+        config_path = self.get_config_path(self.id)
         config = self.get_config()
-        logger.info(f"save agent {config} to {agent_config_path}")
-        dump(config, agent_config_path)
-        return agent_config_path
+        logger.info(f"save agent {config} to {config_path}")
+        dump(config, config_path)
+        return config_path
+
+    @classmethod
+    def from_config(cls, id: str):
+        config_path = cls.get_config_path(id)
+        if not os.path.exists(config_path):
+            raise FileNotFoundError(f"agent config for {id} not found!")
+        data = load(config_path)
+        logger.debug(f"load agent from {config_path}")
+        return cls(**data)
+
+    @classmethod
+    def delete(cls, id: str):
+        config_path = cls.get_config_path(id)
+        if os.path.exists(config_path):
+            logger.info(f"delete agent from {config_path}")
+            os.remove(config_path)
 
 
 class Session(BaseModel):

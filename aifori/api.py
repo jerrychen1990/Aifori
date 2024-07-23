@@ -6,7 +6,7 @@
 @Description  :   api层
 @Contact :   jerrychen1990@gmail.com
 '''
-from aifori.agent import AIAgent
+from aifori.agent import AIAgent, HumanAgent
 from aifori.config import *
 from aifori.core import Session
 from snippets import load
@@ -20,15 +20,23 @@ def get_session(session_id: str) -> Session:
 
 
 def get_assistant(assistant_id: str) -> AIAgent:
-    config_path = os.path.join(AGENT_DIR, assistant_id+".json")
-    if not os.path.exists(config_path):
-        logger.info(f"Assistant config file not found: {config_path}")
-        return None
-    assistant = AIAgent.from_config(config_path)
+    assistant = AIAgent.from_config(id=assistant_id)
     return assistant
 
 
+def get_user(user_id: str) -> HumanAgent:
+    user = HumanAgent.from_config(id=user_id)
+    return user
+
+
 def delete_assistant(assistant_id: str):
+    config_path = os.path.join(AGENT_DIR, assistant_id+".json")
+    if os.path.exists(config_path):
+        logger.info(f"Delete assistant config file: {config_path}")
+        os.remove(config_path)
+
+
+def delete_user(user_id: str):
     config_path = os.path.join(AGENT_DIR, assistant_id+".json")
     if os.path.exists(config_path):
         logger.info(f"Delete assistant config file: {config_path}")

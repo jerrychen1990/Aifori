@@ -21,21 +21,25 @@ from app.config import *
 print("reload")
 HOST = "http://127.0.0.1:9001"
 
+st.set_page_config(page_title="AIFori", page_icon="🤖", layout="wide")
 
-user_name = st.sidebar.text_input("用户名", DEFAULT_USER_NAME)
-user_desc = st.sidebar.text_area("用户描述", DEFAULT_USER_DESC, height=100)
+with st.sidebar.expander("Agent信息配置"):
+    user_name = st.text_input("用户名", DEFAULT_USER_NAME)
+    user_desc = st.text_area("用户描述", DEFAULT_USER_DESC, height=100)
 
-ai_name = st.sidebar.text_input("AI名称", DEFAULT_AI_NAME)
-ai_desc = st.sidebar.text_area("用户描述", DEFAULT_AI_DESC, height=100)
-
+    ai_name = st.text_input("AI名称", DEFAULT_AI_NAME)
+    ai_desc = st.text_area("用户描述", DEFAULT_AI_DESC, height=100)
 
 model = st.sidebar.selectbox("模型", LLM_MODELS)
-character = st.sidebar.selectbox("音色", CHARACTER_MAP.keys())
+
+with st.sidebar.expander("音色配置"):
+    character = st.selectbox("音色", CHARACTER_MAP.keys())
+    voice_id = CHARACTER_MAP[character]["voice_id"]
+    speed = st.slider("语速", 0.5, 2.0, 1.0)
+    pitch = st.slider("音调", -12, 12, 0, 1)
+
 clear = st.sidebar.button("新一轮对话")
-voice_id = CHARACTER_MAP[character]["voice_id"]
-# desc = character_map[character]["desc"]
-speed = st.sidebar.slider("语速", 0.5, 2.0, 1.0)
-pitch = st.sidebar.slider("音调", -12, 12, 0, 1)
+autoplay = st.sidebar.checkbox("自动播放", value=False)
 
 
 class SessionManager:
@@ -53,18 +57,24 @@ class SessionManager:
         self.session_info = dict(agent_id=str(uuid.uuid4()), session_id=str(uuid.uuid4()), user_id=str(uuid.uuid4()))
         self.agent_id = self.session_info["agent_id"]
         self.session_id = self.session_info["session_id"]
+        self.user_id = self.session_info["user_id"]
+
         self.round = 0
-        self.agent_info = self.client.create_agent(agent_id=self.agent_id, name=ai_name, desc=ai_desc, model=model)
+        self.voice_config = dict(voice_id=voice_id, speed=speed, pitch=pitch)
+        self.agent_info = self.client.create_agent(agent_id=self.agent_id, name=ai_name, desc=ai_desc,
+                                                   model=model, voice_config=self.voice_config)
+
+        self.user_info = self.client.create_agent(agent_id=self.agent_id, name=ai_name, desc=ai_desc,
+                                                  model=model, voice_config=self.voice_config)
         self.messages = []
 
     def get_resp(self, prompt):
-
         resp = self.client.chat(message=prompt, **self.session_info, stream=True)
         return resp.content
 
-    def play_message(self, message: str):
+    def play_message(self, message: str, tts_config):
         voice_path = os.path.join(VOICE_DIR, self.session_id, f"{self.round}.mp3")
-        self.client.speak(message=message, agent_id=self.agent_id, callbacks=[[dump_voice, dict(path=voice_path)]])
+        self.client.speak(message=message, agent_id=self.agent_id, callbacks=[[dump_voice, dict(path=voice_path)]], tts_config=tts_config)
         return voice_path
 
     def add_message(self, message):
@@ -106,8 +116,9 @@ if prompt := st.chat_input("你好，你是谁？"):
         # st.info(full_response)
         message_placeholder.markdown(full_response + "▌")
     message_placeholder.markdown(full_response)
-    voice_path = session_manager.play_message(full_response)
-    st.audio(voice_path, format='audio/mp3', autoplay=True)
+    tts_config = dict(voice_id=voice_id, speed=speed, pitch=pitch)
+    voice_path = session_manager.play_message(full_response, tts_config=tts_config)
+    st.audio(voice_path, format='audio/mp3', autoplay=autoplay)
 
     user_message = {"role": "user", "content": prompt, "session_id": session_manager.session_id}
     assistant_message = {"role": "assistant", "content": full_response, "session_id": session_manager.session_id, "voice_path": voice_path}
