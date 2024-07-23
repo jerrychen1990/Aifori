@@ -8,7 +8,7 @@
 '''
 
 
-LLM_MODELS = ["glm-4-airx"]
+LLM_MODELS = ["glm-4-airx",  "glm-4-0520", "glm-4-flash"]
 
 DEFAULT_USER_NAME = "NoBody"
 DEFAULT_USER_DESC = "一个空巢年轻人,没有朋友,没有爱人,没有工作,没有希望。喜欢音乐和诗歌，喜欢一切华美而哀伤的事物。"

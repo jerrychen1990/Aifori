@@ -64,8 +64,7 @@ class SessionManager:
         self.agent_info = self.client.create_agent(agent_id=self.agent_id, name=ai_name, desc=ai_desc,
                                                    model=model, voice_config=self.voice_config)
 
-        self.user_info = self.client.create_agent(agent_id=self.agent_id, name=ai_name, desc=ai_desc,
-                                                  model=model, voice_config=self.voice_config)
+        self.user_info = self.client.create_user(user_id=self.user_id, name=user_name, desc=user_desc)
         self.messages = []
 
     def get_resp(self, prompt):
