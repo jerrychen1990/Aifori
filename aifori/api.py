@@ -29,6 +29,42 @@ def get_user(user_id: str) -> HumanAgent:
     return user
 
 
+def create_assistant(name: str, desc: str, id: str, model: str, voice_config: dict = DEFAULT_VOICE_CONFIG, exists_ok=True, do_save=True) -> AIAgent:
+    try:
+        assistant = get_assistant(id)
+        msg = f"agent:{id} already exists, will not create new one"
+        logger.warning(msg)
+        if not exists_ok:
+            raise Exception(msg)
+        else:
+            return assistant
+    except Exception as e:
+        pass
+
+    assistant = AIAgent(name=name, desc=desc, model=model, id=id, voice_config=voice_config)
+    if do_save:
+        assistant.save()
+    return assistant
+
+
+def create_user(name: str, desc: str, id: str, exists_ok=True, do_save=True) -> HumanAgent:
+    try:
+        user = get_user(id)
+        msg = f"user:{id} already exists, will not create new one"
+        logger.warning(msg)
+        if not exists_ok:
+            raise Exception(msg)
+        else:
+            return user
+    except Exception as e:
+        pass
+
+    user = HumanAgent(name=name, desc=desc, id=id)
+    if do_save:
+        user.save()
+    return user
+
+
 def delete_assistant(assistant_id: str):
     config_path = os.path.join(AGENT_DIR, assistant_id+".json")
     if os.path.exists(config_path):
@@ -37,7 +73,7 @@ def delete_assistant(assistant_id: str):
 
 
 def delete_user(user_id: str):
-    config_path = os.path.join(AGENT_DIR, assistant_id+".json")
+    config_path = os.path.join(AGENT_DIR, user_id+".json")
     if os.path.exists(config_path):
         logger.info(f"Delete assistant config file: {config_path}")
         os.remove(config_path)

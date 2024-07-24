@@ -9,15 +9,13 @@
 
 
 import copy
-import os
-from typing import List
 from loguru import logger
 from aifori.core import Agent, AgentInfo, AssistantMessage, Message, StreamAssistantMessage, StreamMessage, UserMessage, Voice
 from aifori.memory import DBMemory, RawMemory
 from aifori.tts import tts
 from liteai.api import chat
+from aifori.rule import rule_match
 from aifori.session import SESSION_MANAGER
-from zhipuai import ZhipuAI
 
 
 class AIAgent(Agent):
@@ -45,7 +43,31 @@ class AIAgent(Agent):
         logger.debug(system)
         return system
 
+    def _static_response(self, resp: str, stream: bool, **kwargs) -> Message:
+        if stream:
+            return StreamAssistantMessage(content=(e for e in resp), user_id=self.id)
+        return AssistantMessage(content=resp, user_id=self.id)
+
+    def _dispatch(self, message: UserMessage, **kwargs):
+        match_rules = rule_match(query=message.content, match_all=False, regex=True)
+        kwargs = copy.deepcopy(kwargs)
+        if match_rules:
+            func = match_rules[0]["func"]
+            kwargs.update(match_rules[0]["kwargs"])
+        else:
+            func = "chat"
+
+        if func == "static_response":
+            return self._static_response(**kwargs)
+        elif func == "chat":
+            return self._chat(message=message, **kwargs)
+        else:
+            raise NotImplementedError(f"func {func} not implemented")
+
     def chat(self, message: UserMessage, stream=False, session_id=None, **kwargs) -> Message | StreamMessage:
+        return self._dispatch(message=message, stream=stream, session_id=session_id, **kwargs)
+
+    def _chat(self, message: UserMessage, stream=False, session_id=None, **kwargs) -> Message | StreamMessage:
         history = SESSION_MANAGER.get_history(_from=[self.id, message.user_id], to=[self.id, message.user_id], session_id=session_id)
         system = self._build_system(user_id=message.user_id)
 
@@ -95,45 +117,32 @@ class HumanAgent(Agent):
         self.role = "user"
 
 
-def call_lingxin(user_info: AgentInfo, agent_info: AgentInfo, model: str, messages: List[str], stream=True):
-    api_key = os.environ["ZHIPU_API_KEY"]
-    client = ZhipuAI(api_key=api_key)  # 填写您自己的APIKey
-    meta = dict(user_info=user_info.desc, user_name=user_info.name, bot_info=agent_info.desc, bot_name=agent_info.name)
-    logger.info(f"calling lingxin with: {meta=} {model=} {messages=}, {api_key=}")
+# def call_lingxin(user_info: AgentInfo, agent_info: AgentInfo, model: str, messages: List[str], stream=True):
+#     api_key = os.environ["ZHIPU_API_KEY"]
+#     client = ZhipuAI(api_key=api_key)  # 填写您自己的APIKey
+#     meta = dict(user_info=user_info.desc, user_name=user_info.name, bot_info=agent_info.desc, bot_name=agent_info.name)
+#     logger.info(f"calling lingxin with: {meta=} {model=} {messages=}, {api_key=}")
 
-    response = client.chat.completions.create(
-        model=model,  # 填写需要调用的模型名称
-        meta=meta,
-        messages=messages,
-        stream=stream
-    )
-    if not stream:
-        return response.choices[0].message.content
-    else:
-        def _gen():
-            acc = ""
-            for chunk in response:
-                # print(chunk)
-                resp = chunk.choices[0].delta.content if chunk.choices[0].delta else ""
-                if resp:
-                    yield resp
-                    acc += resp
-            logger.debug(f"streaming response :{acc}")
-        return _gen()
-
-
-# def chat_llm(user_info: AgentInfo, agent_info: AgentInfo, model: str, messages: List[str], stream=True, **kwargs):
-#     if model.lower() in ["emohaa", "charglm-3"]:
-#         return call_lingxin(user_info, agent_info, model, messages, stream=stream)
+#     response = client.chat.completions.create(
+#         model=model,  # 填写需要调用的模型名称
+#         meta=meta,
+#         messages=messages,
+#         stream=stream
+#     )
+#     if not stream:
+#         return response.choices[0].message.content
 #     else:
-#         system = f"""你的任务是根据自己的信息，以及用户的信息，提供良好的陪伴服务
-# 你的名字:{agent_info.name}
-# 你的描述:{agent_info.desc}
-# 用户名字: {user_info.name}
-# 用户描述: {user_info.desc}
-# """
-#         messages.insert(0, {"role": "system", "content": system})
-#         return chat(model=model, messages=messages, stream=stream, **kwargs).content
+#         def _gen():
+#             acc = ""
+#             for chunk in response:
+#                 # print(chunk)
+#                 resp = chunk.choices[0].delta.content if chunk.choices[0].delta else ""
+#                 if resp:
+#                     yield resp
+#                     acc += resp
+#             logger.debug(f"streaming response :{acc}")
+#         return _gen()
+
 
 if __name__ == "__main__":
     user = HumanAgent(agent_info=AgentInfo(name="张三", desc="30岁的男性软件工程师，兴趣包括阅读、徒步和编程", role="user"), memory=None)

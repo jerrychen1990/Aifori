@@ -9,8 +9,9 @@
 
 import unittest
 from aifori.agent import *
-from aifori.api import get_assistant
+from aifori.api import create_assistant, create_user, get_assistant
 from loguru import logger
+from aifori.config import *
 from aifori.tts import play_voice
 from snippets import set_logger
 
@@ -22,31 +23,33 @@ class TestAgent(unittest.TestCase):
         logger.info("start test agent")
         cls.agent_id = "ut_agent"
         cls.user_id = "ut_user"
+        cls.agent = create_assistant(id=cls.agent_id, name=DEFAULT_AI_NAME, desc=DEFAULT_AI_DESC, model=DEFAULT_MODEL, exists_ok=True)
+        cls.user = create_user(id=cls.user_id, name=DEFAULT_USER_NAME, desc=DEFAULT_USER_DESC, exists_ok=True)
+
+    def test_rule_chat(self):
+        # 测试规则问答
+        message: AssistantMessage = UserMessage(content="你好呀,你叫什么名字", user_id=self.user_id)
+        resp = self.agent.chat(message, max_tokens=64)
+        logger.info(resp)
+        assert resp.content == "你好呀，我叫Aifori，很高兴认识你！"
 
     def test_agent_chat(self):
-        name = "Aifori"
-        desc = "Aifori是一款基于Hill助人理论的情感支持AI，拥有专业的心理咨询话术能力。能够和对方共情、安慰，并且记得对方说的所有话"
-        agent = AIAgent(id=self.agent_id, name=name, desc=desc, model="GLM-4-Flash")
 
         # 测试问答
         message: AssistantMessage = UserMessage(content="你好，我最近心情不好，不知道该怎么办", user_id=self.user_id)
-        resp = agent.chat(message, max_tokens=128)
+        resp = self.agent.chat(message, max_tokens=128)
         logger.info(resp)
 
         # 测试流式
         message: AssistantMessage = UserMessage(content="能给我推荐三首歌么", user_id=self.user_id)
-        resp = agent.chat(message, max_tokens=128, stream=True, do_remember=True)
+        resp = self.agent.chat(message, max_tokens=128, stream=True, do_remember=True)
         logger.info(f"{resp=}")
         for item in resp.content:
             logger.info(item)
 
-        # 测试save/load
-        agent.save()
-        agent = get_assistant(agent.id)
-
         # 测试多轮
         message: AssistantMessage = UserMessage(content="详细介绍一下第三首", user_id=self.user_id)
-        resp = agent.chat(message, max_tokens=64)
+        resp = self.agent.chat(message, max_tokens=64)
         logger.info(resp)
 
     def test_speak(self):

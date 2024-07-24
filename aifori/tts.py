@@ -20,6 +20,8 @@ import requests
 from loguru import logger
 from aifori.config import *
 from snippets import jdumps, batchify
+from pydub import AudioSegment
+from pydub.playback import play
 
 
 def minimax_tts(text: str, model="speech-01-turbo", version="t2a_v2", append=False,
@@ -188,20 +190,30 @@ def get_play_process():
     return mpv_process
 
 
-def play_voice(voice_stream: Iterable[bytes]):
-    process = get_play_process()
-    rs_voice_stream = list()
+def play_voice(voice_stream: Iterable[bytes] | str):
+    if isinstance(voice_stream, str):
+        assert voice_stream.endswith(".mp3")
+        # 加载 mp3 文件
+        song = AudioSegment.from_mp3(voice_stream)
 
-    audio = b""
-    for chunk in voice_stream:
-        if chunk is not None and chunk != b'\n':
-            decoded_hex = chunk
-            # logger.debug(f"flush {len(decoded_hex)} bytes to play")
-            process.stdin.write(decoded_hex)  # type: ignore
-            process.stdin.flush()
-            audio += decoded_hex
-            rs_voice_stream.append(chunk)
-    return rs_voice_stream
+        # 播放
+        play(song)
+        return voice_stream
+    else:
+
+        process = get_play_process()
+        rs_voice_stream = list()
+
+        audio = b""
+        for chunk in voice_stream:
+            if chunk is not None and chunk != b'\n':
+                decoded_hex = chunk
+                # logger.debug(f"flush {len(decoded_hex)} bytes to play")
+                process.stdin.write(decoded_hex)  # type: ignore
+                process.stdin.flush()
+                audio += decoded_hex
+                rs_voice_stream.append(chunk)
+        return rs_voice_stream
 
 
 def dump_voice(voice_stream: Iterable[bytes], path: str):

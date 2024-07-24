@@ -13,10 +13,8 @@ import streamlit as st
 
 from aifori.client import AiForiClient
 from aifori.config import VOICE_DIR
-from aifori.tts import dump_voice
 from snippets import set_logger
 from app.config import *
-
 
 
 print("reload")
@@ -72,9 +70,9 @@ class SessionManager:
         resp = self.client.chat(message=prompt, **self.session_info, stream=True)
         return resp.content
 
-    def play_message(self, message: str, tts_config):
+    def play_message(self, message: str, voice_config):
         voice_path = os.path.join(VOICE_DIR, self.session_id, f"{self.round}.mp3")
-        self.client.speak(message=message, agent_id=self.agent_id, callbacks=[[dump_voice, dict(path=voice_path)]], tts_config=tts_config)
+        self.client.speak(message=message, agent_id=self.agent_id, dump_path=voice_path, play_local=False, voice_config=voice_config)
         return voice_path
 
     def add_message(self, message):
@@ -116,8 +114,8 @@ if prompt := st.chat_input("你好，你是谁？"):
         # st.info(full_response)
         message_placeholder.markdown(full_response + "▌")
     message_placeholder.markdown(full_response)
-    tts_config = dict(voice_id=voice_id, speed=speed, pitch=pitch)
-    voice_path = session_manager.play_message(full_response, tts_config=tts_config)
+    voice_config = dict(voice_id=voice_id, speed=speed, pitch=pitch)
+    voice_path = session_manager.play_message(full_response, voice_config=voice_config)
     st.audio(voice_path, format='audio/mp3', autoplay=autoplay)
 
     user_message = {"role": "user", "content": prompt, "session_id": session_manager.session_id}

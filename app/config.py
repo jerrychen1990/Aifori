@@ -10,11 +10,6 @@
 
 LLM_MODELS = ["glm-4-airx",  "glm-4-0520", "glm-4-flash"]
 
-DEFAULT_USER_NAME = "NoBody"
-DEFAULT_USER_DESC = "一个空巢年轻人,没有朋友,没有爱人,没有工作,没有希望。喜欢音乐和诗歌，喜欢一切华美而哀伤的事物。"
-
-DEFAULT_AI_NAME = "Aifori"
-DEFAULT_AI_DESC = f"{DEFAULT_AI_NAME}是一款基于Hill助人理论的情感支持AI，拥有专业的心理咨询话术能力。富有同情心和同理心，说话简洁而幽默"
 
 
 CHARACTER_MAP = {

@@ -12,3 +12,4 @@ streamlit
 mem0ai
 sqlalchemy
 click
+pydub
