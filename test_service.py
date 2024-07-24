@@ -86,10 +86,10 @@ def test_agent():
     # client.speak(agent_id=AGENT_ID, message=user_message, voice_config=user_voice_config)
     # 回答+朗读
     assistant_message, voice = client.chat_and_speak(agent_id=AGENT_ID, user_id=USER_ID, session_id=SESSION_ID, voice_config=user_voice_config,
-                                                     dump_path=voice_path, play_local=False, message=user_message, max_word=50)
-
+                                                     dump_path=voice_path, play_local=DO_SPEAK, message=user_message, max_word=50)
+    if DO_SPEAK:
+        play_voice(voice_path)
     logger.info(f"{assistant_message.content=}")
-    play_voice(voice_path)
 
 
 def clean_up():
