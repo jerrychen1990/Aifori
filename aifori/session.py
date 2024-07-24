@@ -9,7 +9,7 @@
 
 from typing import List
 
-from sqlalchemy import and_, desc
+from sqlalchemy import and_, desc, or_
 from aifori.core import Message
 from aifori.db import DB, MessageORM
 
@@ -27,14 +27,29 @@ class SessionManager:
         DB.commit()
         DB.refresh(orm_message)
 
-    def get_history(self, related_ids: List[str] = None, session_id: str = None, limit=10) -> List[Message]:
-        logger.debug(f"get history with {related_ids=}, {limit=}")
-
+    def get_history(self, _from: str | List[str] = None, to: str | List[str] = None, operator="and", session_id: str = None, limit=10) -> List[Message]:
+        logger.debug(f"get history with {_from=}. {to=}, {session_id=}, {limit=}")
         query = DB.query(MessageORM)
         if session_id:
             query = query.filter(MessageORM.session_id == session_id)
-        if related_ids:
-            query = query.filter(and_(MessageORM.from_id.in_(related_ids), MessageORM.to_id.in_(related_ids)))
+        filter_phase = None
+        if _from:
+            _from = [_from] if isinstance(_from, str) else _from
+            filter_phase = MessageORM.from_id.in_(_from)
+        if to:
+            to = [to] if isinstance(to, str) else to
+            tmp_phase = MessageORM.to_id.in_(to)
+
+            if filter_phase is not None:
+                if operator == "and":
+                    filter_phase = and_(filter_phase, tmp_phase)
+                else:
+                    filter_phase = or_(filter_phase, tmp_phase)
+            else:
+                filter_phase = MessageORM.to_id.in_(to)
+
+        if filter_phase is not None:
+            query = query.filter(filter_phase)
 
         orm_messages: List[MessageORM] = query.order_by(desc(MessageORM.id)).limit(limit).all()
         orm_json_messages = [m.to_dict() for m in orm_messages]

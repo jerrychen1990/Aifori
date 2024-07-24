@@ -85,7 +85,7 @@ class AiForiClient(object):
         # logger.debug(f"{voice=}")
         for callback, kwargs in callbacks:
             logger.debug(f"calling {callback.__name__}")
-            callback(voice, **kwargs)
+            voice = callback(voice, **kwargs)
         return voice
 
     def clear_session(self, session_id: str) -> dict:
@@ -99,3 +99,7 @@ class AiForiClient(object):
         logger.debug(f"{resp_message=}")
         voice = self.speak(agent_id, message=resp_message.content, tts_config=tts_config, max_word=max_word, callbacks=speak_callbacks)
         return resp_message, voice
+
+    def list_messages(self, agent_id: str,  session_id: str = None, limit: int = 10) -> List[Message]:
+        resp = self._do_request('/message/list', json={'agent_id': agent_id, 'session_id': session_id, 'limit': limit})
+        return [Message.model_validate(message) for message in resp]

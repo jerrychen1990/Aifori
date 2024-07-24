@@ -5,9 +5,9 @@ from fastapi.responses import StreamingResponse
 from aifori.agent import AIAgent, HumanAgent
 from aifori.session import SESSION_MANAGER
 from aifori.tts import tts as tts_api
-from aifori.core import AssistantMessage, UserMessage
+from aifori.core import AssistantMessage, Message, UserMessage
 from pydantic import BaseModel, Field
-from typing import Any
+from typing import Any, List
 
 import aifori.api as api
 from loguru import logger
@@ -90,9 +90,9 @@ async def delete_agent(id: str = Body(description="Agent的ID,唯一键", exampl
 @app.post("/user/create", tags=["user"], description="创建一个人类用户")
 @try_wrapper
 async def create_user(
-        id: str = Body(default=None, description="Agent的ID,唯一键，如果不传则自动生成", examples=["test_agent"]),
-        name: str = Body(default="Aifori", description="Agent的名字", example="Aifori"),
-        desc: str = Body(default="Aifori是一款基于Hill助人理论的情感支持AI，拥有专业的心理咨询话术能力。能够和对方共情、安慰，并且记得对方说的所有话", description="Agent的描述")) -> Response:
+        id: str = Body(default=None, description="User的ID,唯一键，如果不传则自动生成", examples=["test_user"]),
+        name: str = Body(default="Nobody", description="User的名字"),
+        desc: str = Body(default="一个空巢年轻人,没有朋友,没有爱人,没有工作,没有希望。喜欢音乐和诗歌，喜欢一切华美而哀伤的事物。", description="User的描述")) -> Response:
     try:
         user = get_user(id)
         raise Exception(f"user:{id} already exists")
@@ -125,8 +125,6 @@ async def chat_agent(agent_id: str = Body(description="Agent的ID,唯一键", ex
                      message: str = Body(description="用户发送的消息", examples=["你好呀，你叫什么名字？"]),
                      do_remember: bool = Body(default=True, description="Agent是否记忆这轮对话")) -> Response:
     assistant = api.get_assistant(agent_id)
-    if not assistant:
-        raise Exception(f"agent:{agent_id} not found")
     user_message = UserMessage(content=message, user_id=user_id)
     assistant_message = assistant.chat(message=user_message,  stream=False, temperature=0)
 
@@ -195,3 +193,12 @@ async def tts(message: str = Body(default="你好呀，我的名字叫Aifori", d
 async def clear_session(session_id: str = Body(description="session_id", examples=["test_session"], embed=True)) -> Response:
     SESSION_MANAGER.clear_session(session_id)
     return Response(data=dict(status="ok"))
+
+
+@app.post("/message/list", tags=["message"], description="列出最近的对话消息", summary="列出最近的对话消息")
+async def list_messages(session_id: str = Body(description="按照session_id过滤message，不传则不按照session_id过滤", examples=["test_session"], default=None),
+                        agent_id: str = Body(description="按照agent_id过滤message（所有agent_id发出或者收到的message），不传则不按照agent_id过滤",
+                                             examples=["test_agent"], default=None),
+                        limit: int = Body(default=10, description="限制返回的条数", examples=[10])) -> Response:
+    messages: List[Message] = SESSION_MANAGER.get_history(_from=agent_id, to=agent_id, operator="or", session_id=session_id, limit=limit)
+    return Response(data=messages)

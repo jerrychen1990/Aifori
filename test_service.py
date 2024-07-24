@@ -9,7 +9,7 @@
 
 import click
 from loguru import logger
-from aifori.tts import dump_voice
+from aifori.tts import dump_voice, play_voice
 from snippets import set_logger
 from aifori.client import AiForiClient
 from snippets import load
@@ -88,7 +88,7 @@ def test_agent():
     # 回答+朗读
     speak_callbacks = [[dump_voice, dict(path=voice_path)]]
     if DO_SPEAK:
-        speak_callbacks.append()
+        speak_callbacks.append([play_voice, dict()])
     assistant_message, voice = client.chat_and_speak(agent_id=AGENT_ID, user_id=USER_ID, session_id=SESSION_ID,
                                                      speak_callbacks=speak_callbacks, message=user_message, max_word=50)
     logger.info(f"{assistant_message.content=}")
@@ -97,18 +97,27 @@ def test_agent():
 def clean_up():
     client.delete_agent(agent_id=AGENT_ID)
     client.delete_user(user_id=USER_ID)
+    client.clear_session(session_id=SESSION_ID)
+
+
+def test_session():
+    messages = client.list_messages(agent_id=AGENT_ID, session_id=SESSION_ID, limit=20)
+    logger.info(f"{messages=}")
 
 
 @click.command()
 @click.argument('config_path')
 def main(config_path: str):
     config = load(config_path)
-    locals().update(**config)
+    globals().update(**config)
     logger.info(f"testing with config:{config}")
-    logger.info(locals())
+    # logger.info(f"{DO_SPEAK=}")
+    logger.info(globals())
+
     try:
         client.check_health()
         test_agent()
+        test_session()
         clean_up()
         logger.info("☺☺☺☺☺☺☺☺☺☺☺☺☺☺☺☺☺☺☺☺☺TEST SUCCESS☺☺☺☺☺☺☺☺☺☺☺☺☺☺☺☺☺☺☺☺☺")
 

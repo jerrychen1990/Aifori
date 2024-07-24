@@ -8,14 +8,18 @@
 '''
 
 
+import io
 import json
 import os
 import subprocess
-from typing import Iterable
+import threading
+from time import sleep
+from typing import Iterable, Iterator
+from gtts import gTTS
 import requests
 from loguru import logger
 from aifori.config import *
-from snippets import jdumps
+from snippets import jdumps, batchify
 
 
 def minimax_tts(text: str, model="speech-01-turbo", version="t2a_v2", append=False,
@@ -81,7 +85,7 @@ def get_md5(text):
     return md5.hexdigest()
 
 
-def tts(text, provider="minimax", tgt_path=None, stream=False, **kwargs):
+def tts(text: str | Iterable[str], provider="minimax", tgt_path=None, stream=False, **kwargs):
     if not tgt_path:
         tgt_path = os.path.join(VOICE_DIR, provider, get_md5(text) + ".mp3")
     os.makedirs(os.path.dirname(tgt_path), exist_ok=True)
@@ -96,6 +100,76 @@ def tts(text, provider="minimax", tgt_path=None, stream=False, **kwargs):
             return bytes
     else:
         raise Exception(f"Unknown provider: {provider}")
+
+
+class TTSStreamThread(threading.Thread):
+    def __init__(self, text: str | Iterable[str], provider="minimax", input_chunk_size=16, output_chunks_size=32, wait_time=0.5, ** kwargs):
+        super().__init__()
+        self.text = text
+        self.provider = provider
+        self.input_chunk_size = input_chunk_size
+        self.output_chunks_size = output_chunks_size
+        self.kwargs = kwargs
+        self.audio_stream = io.BytesIO()
+        self._stop_event = threading.Event()
+        self.read_start = 0
+        self.wait_time = wait_time
+        self.lock = threading.Lock()
+
+    def run(self):
+        if isinstance(self.text, str):
+            text_stream = list(self.text)
+        else:
+            text_stream = self.text
+
+        for batch in batchify(text_stream, self.input_chunk_size):
+            logger.debug(f"calling tts_stream with batch: {batch}")
+            batch = "".join(batch)
+            with self.lock:
+                if self.provider == "minimax":
+                    batch_voice = minimax_tts(batch, stream=True, **self.kwargs)
+                    for item in batch_voice:
+                        self.audio_stream.write(item)
+                elif self.provider == "google":
+                    tts = gTTS(self.text)
+                    tts.write_to_fp(self.audio_stream)
+                else:
+                    raise Exception(f"Unknown provider: {self.provider}")
+
+        logger.debug("tts stream finished")
+        self._stop_event.set()
+
+    def stop(self):
+        logger.info("stopping tts stream")
+        self._stop_event.set()
+
+    def yield_audio_bytes(self):
+        # self.audio_stream.seek(0)
+        while True:
+            with self.lock:
+                # logger.debug(f"reading from :{self.read_start}")
+                self.audio_stream.seek(self.read_start)
+                chunk = self.audio_stream.read(self.output_chunks_size)
+                self.read_start = self.audio_stream.tell()
+
+                # logger.info(f"yielding chunk {chunk}")
+                if not chunk:
+                    if self._stop_event.is_set():
+                        break
+                    else:
+                        # logger.debug("no new chunk, waiting")
+                        sleep(self.wait_time)
+                        continue
+                yield chunk
+        logger.info("read tts stream ended")
+
+
+def tts_stream(text: str | Iterable[str], provider="minimax", input_chunk_size=32, output_chunks_size=1024 * 10, wait_time=.5, **kwargs) -> Iterator[str]:
+
+    tts_thread = TTSStreamThread(text=text, provider=provider, input_chunk_size=input_chunk_size,
+                                 output_chunks_size=output_chunks_size, wait_time=wait_time, ** kwargs)
+    tts_thread.start()
+    yield from tts_thread.yield_audio_bytes()
 
 
 mpv_process = None
@@ -116,23 +190,32 @@ def get_play_process():
 
 def play_voice(voice_stream: Iterable[bytes]):
     process = get_play_process()
+    rs_voice_stream = list()
+
     audio = b""
     for chunk in voice_stream:
         if chunk is not None and chunk != b'\n':
             decoded_hex = chunk
+            # logger.debug(f"flush {len(decoded_hex)} bytes to play")
             process.stdin.write(decoded_hex)  # type: ignore
             process.stdin.flush()
             audio += decoded_hex
+            rs_voice_stream.append(chunk)
+    return rs_voice_stream
 
 
 def dump_voice(voice_stream: Iterable[bytes], path: str):
+    rs_voice_stream = list()
+
     os.makedirs(os.path.dirname(path), exist_ok=True)
+
     with open(path, "wb") as f:
         for chunk in voice_stream:
             if chunk is not None and chunk != b'\n':
                 decoded_hex = chunk
                 f.write(decoded_hex)
-    return path
+                rs_voice_stream.append(decoded_hex)
+    return rs_voice_stream
 
 
 if __name__ == "__main__":

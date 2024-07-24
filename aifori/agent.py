@@ -27,13 +27,16 @@ class AIAgent(Agent):
         self.memory = DBMemory(agent_id=self.id)
         self.model = model
         self.voice_config = voice_config
-        self.system_template = """你是一个善解人意的聊天机器人
-你的名字叫:{agent_name}
-你的人设是:{agent_desc}
-你在和{user_name}聊天
-{user_name}的人设:{user_desc}
-请遵循以下规则聊天
-请简短、温和地和用户对话"""
+        self.system_template = """你是一个善解人意的聊天机器人，你需要参考**背景信息**和户聊天，聊天时需要遵守**聊天规范**
+**背景信息**
+你的名字:{agent_name}
+你的人设:{agent_desc}
+用户的名字:{user_name}
+用户的人设:{user_desc}
+
+**聊天规范**
+1.请简短、温和地和用户对话
+2.当用户问询你的名字时，请回答出你的名字"""
 
     def _build_system(self, user_id: str) -> str:
         user = HumanAgent.from_config(id=user_id)
@@ -43,7 +46,7 @@ class AIAgent(Agent):
         return system
 
     def chat(self, message: UserMessage, stream=False, session_id=None, **kwargs) -> Message | StreamMessage:
-        history = SESSION_MANAGER.get_history(related_ids=[self.id, message.user_id], session_id=session_id)
+        history = SESSION_MANAGER.get_history(_from=[self.id, message.user_id], to=[self.id, message.user_id], session_id=session_id)
         system = self._build_system(user_id=message.user_id)
 
         messages = [dict(role="system", content=system)] + history + [message]
