@@ -179,3 +179,5 @@ record/adopters.jsonl
 *.mp3
 qdrant_storage/
 db/
+cert.pem
+key.pem
