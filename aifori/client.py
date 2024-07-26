@@ -11,6 +11,7 @@
 import copy
 import json
 import os
+import time
 from typing import List, Tuple
 import requests
 from aifori.core import AssistantMessage, Message, StreamAssistantMessage, Voice
@@ -68,6 +69,8 @@ class AiForiClient(object):
 
     def chat(self,  stream=True, **kwargs) -> StreamAssistantMessage | AssistantMessage:
         data = copy.copy(kwargs)
+        st = time.time()
+        perf = dict()
         if stream:
             resp = self._do_request('/agent/chat_stream', json=data, stream=True).iter_lines()
             assistant_id = json.loads(next(resp).decode('utf-8'))["assistant_id"]

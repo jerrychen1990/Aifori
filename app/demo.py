@@ -8,11 +8,13 @@
 '''
 
 import os
+import time
 import uuid
 import streamlit as st
 
 from aifori.client import AiForiClient
 from aifori.config import *
+from aifori.tts import get_mp3_duration
 from snippets import set_logger
 from app.config import *
 
@@ -108,15 +110,21 @@ if prompt := st.chat_input("你好，你是谁？"):
         message_placeholder = st.empty()
         full_response = ""
 
+    stt = time.time()
     resp = session_manager.get_resp(prompt)
     for token in resp:
+        fist_token_latency = time.time() - stt
         full_response += token
         # st.info(full_response)
         message_placeholder.markdown(full_response + "▌")
     message_placeholder.markdown(full_response)
     voice_config = dict(voice_id=voice_id, speed=speed, pitch=pitch)
     voice_path = session_manager.play_message(full_response, voice_config=voice_config)
+    first_voice_latency = time.time() - stt
+    video_duration = get_mp3_duration(voice_path)
+
     st.audio(voice_path, format='audio/mp3', autoplay=autoplay)
+    st.info(f"返回[{len(full_response)}]字, 首字延时[{fist_token_latency:2.3f}]s, 音频延时[{first_voice_latency:2.3f}]s, 音频时长[{video_duration:2.1f}]s")
 
     user_message = {"role": "user", "content": prompt, "session_id": session_manager.session_id}
     assistant_message = {"role": "assistant", "content": full_response, "session_id": session_manager.session_id, "voice_path": voice_path}

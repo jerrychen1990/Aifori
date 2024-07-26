@@ -230,6 +230,12 @@ def dump_voice(voice_stream: Iterable[bytes], path: str):
     return rs_voice_stream
 
 
+def get_mp3_duration(file_path):
+    audio = AudioSegment.from_mp3(file_path)
+    duration = len(audio) / 1000  # 时长以毫秒为单位
+    return duration
+
+
 if __name__ == "__main__":
     path = tts("你好呀，我是小白")
     print(path)
