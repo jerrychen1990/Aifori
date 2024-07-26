@@ -12,13 +12,13 @@ import uuid
 import streamlit as st
 
 from aifori.client import AiForiClient
-from aifori.config import VOICE_DIR
+from aifori.config import *
 from snippets import set_logger
 from app.config import *
 
 
 print("reload")
-HOST = "http://127.0.0.1:9001"
+HOST = "https://127.0.0.1:9001"
 
 st.set_page_config(page_title="AIFori", page_icon="🤖", layout="wide")
 

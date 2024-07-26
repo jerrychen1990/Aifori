@@ -17,6 +17,9 @@ from aifori.core import AssistantMessage, Message, StreamAssistantMessage, Voice
 from loguru import logger
 
 from aifori.tts import dump_voice, play_voice
+import urllib3
+
+urllib3.disable_warnings()
 
 
 class AiForiClient(object):
@@ -27,9 +30,9 @@ class AiForiClient(object):
         url = f"{self.host}{path}"
         logger.debug(f"{method.upper()} to {url} with {json=}, {files=}, {stream=}")
         if json:
-            resp = requests.request(method, url, json=json, stream=stream)
+            resp = requests.request(method, url, json=json, stream=stream, verify=False)
         else:
-            resp = requests.request(method, url, files=files, stream=stream)
+            resp = requests.request(method, url, files=files, stream=stream, verify=False)
         resp.raise_for_status()
         if not stream:
             if resp.json()["code"] != 200:

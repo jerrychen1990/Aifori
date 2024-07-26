@@ -8,10 +8,11 @@
 '''
 
 
+import os
 from snippets import set_logger
 from dotenv import load_dotenv
-from aifori.config import LOG_HOME
+from aifori.config import AIFORI_ENV, LOG_HOME
 
 
-set_logger("DEV", __name__, log_dir=LOG_HOME, show_process=True)
+set_logger(AIFORI_ENV, __name__, log_dir=os.path.join(LOG_HOME, "aifori"), show_process=True)
 load_dotenv()

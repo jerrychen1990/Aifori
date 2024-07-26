@@ -1,4 +1,5 @@
 from functools import wraps
+import itertools
 import json
 import shutil
 from fastapi import Body, FastAPI, File, UploadFile
@@ -6,17 +7,18 @@ from fastapi.responses import StreamingResponse
 from aifori.agent import AIAgent, HumanAgent
 from aifori.session import SESSION_MANAGER
 from aifori.config import *
-from aifori.core import AssistantMessage, Message, UserMessage
+from aifori.core import AssistantMessage, Message, UserMessage, Voice
 from pydantic import BaseModel, Field
 from typing import Any, List
 
 import aifori.api as api
 from loguru import logger
-from snippets import set_logger, load
+from aifori.tts import dump_voice
+from snippets import load, add_callback2gen, log_function_info, set_logger
+from hashlib import md5
 
-
+set_logger(AIFORI_ENV, __name__, log_dir=os.path.join(LOG_HOME, "service"), show_process=True)
 app = FastAPI()
-set_logger(env="dev", module_name=__name__)
 
 
 class Response(BaseModel):
@@ -106,6 +108,7 @@ async def delete_user(id: str = Body(description="USER的ID,唯一键", examples
 
 @app.post("/agent/chat", tags=["agent"], description="和Agent进行对话, 批式")
 @try_wrapper
+@log_function_info(input_level="INFO", result_level=None)
 async def chat_agent(agent_id: str = Body(description="Agent的ID,唯一键", examples=["test_agent"]),
                      user_id: str = Body(description="用户的ID,唯一键", examples=["test_user"]),
                      session_id: str = Body(description="对话的ID,唯一键", examples=["test_session"]),
@@ -118,6 +121,7 @@ async def chat_agent(agent_id: str = Body(description="Agent的ID,唯一键", ex
     if do_remember:
         SESSION_MANAGER.add_message(user_message, to_id=agent_id, to_role="assistant", session_id=session_id)
         SESSION_MANAGER.add_message(assistant_message, to_id=user_id, to_role="user", session_id=session_id)
+    logger.info(f"agent {agent_id} reply {assistant_message} for user message:{user_message}")
 
     return Response(data=assistant_message)
 
@@ -129,8 +133,6 @@ async def chat_agent_stream(agent_id: str = Body(description="Agent的ID,唯一�
                             session_id: str = Body(default=None, description="对话的ID,唯一键"),
                             message: str = Body(description="用户发送的消息", examples=["你好呀，你叫什么名字？"]),
                             do_remember: bool = Body(default=True, description="Agent是否记忆这轮对话")) -> StreamingResponse:
-    logger.debug("agent chat stream")
-
     assistant = api.get_assistant(agent_id)
     user_message = UserMessage(content=message, user_id=user_id)
     assistant_message = assistant.chat(message=user_message,  stream=True)
@@ -138,19 +140,18 @@ async def chat_agent_stream(agent_id: str = Body(description="Agent的ID,唯一�
     if do_remember:
         SESSION_MANAGER.add_message(user_message, to_id=agent_id, to_role="assistant", session_id=session_id)
 
-    def gen():
-        message = ""
-        yield json.dumps(dict(assistant_id=agent_id)) + "\n"
-        for item in assistant_message.content:
-            # logger.info(f"{item=}")
-            yield json.dumps(dict(chunk=item), ensure_ascii=False) + "\n"
-            message += item
+    def stream2message(items):
+        content = "".join(items)
+        message = AssistantMessage(content=content, user_id=agent_id)
+        logger.info(f"agent {agent_id} reply {message} for user message:{user_message}")
         if do_remember:
-            message = AssistantMessage(content=message, user_id=agent_id)
-            logger.debug(f"remembering assistant message: {message}")
             SESSION_MANAGER.add_message(message, to_id=user_id, to_role="user", session_id=session_id)
 
-    return StreamingResponse(gen(), media_type="application/x-ndjson")
+    content_stream = add_callback2gen(items=assistant_message.content, callback=stream2message)
+    content_stream = itertools.chain((json.dumps(dict(assistant_id=agent_id)) + "\n"),
+                                     (json.dumps(dict(chunk=item), ensure_ascii=False) + "\n" for item in content_stream))
+
+    return StreamingResponse(content_stream, media_type="application/x-ndjson")
 
 
 @app.post("/agent/speak_stream", tags=["agent"], description="让Agent朗读文字, 流式返回")
@@ -158,17 +159,20 @@ async def chat_agent_stream(agent_id: str = Body(description="Agent的ID,唯一�
 async def speak_agent_stream(agent_id: str = Body(description="Agent的ID,唯一键", examples=["test_agent"]),
                              message: str = Body(description="需要说出来的文字内容", examples=["你好呀，我的名字叫Aifori"]),
                              voice_config: dict = Body(default=DEFAULT_VOICE_CONFIG, description="tts的配置")) -> StreamingResponse:
-    logger.debug(f"agent speak stream with {agent_id=}")
+    logger.info(f"agent {agent_id} speak {message} with {voice_config=}")
     assistant = api.get_assistant(agent_id)
     if not assistant:
         raise Exception(f"agent:{agent_id} not found")
-    voice = assistant.speak(message=message, stream=True, **voice_config)
-    logger.debug(f"{voice=}")
+    voice: Voice = assistant.speak(message=message, stream=True, **voice_config)
+    voice_path = os.path.join(VOICE_DIR, "tmp_speak", f"{agent_id}_{md5(''.encode()).hexdigest()}.mp3")
+    voice.content = add_callback2gen(items=voice.content, callback=dump_voice, path=voice_path)
+    logger.info(f"dump agent {agent_id} speak {message} to {voice_path}")
     return StreamingResponse(voice.content, media_type="audio/mp3")
 
 
 @app.post("/session/clear", tags=["session"], description="清空session的历史")
 async def clear_session(session_id: str = Body(description="session_id", examples=["test_session"], embed=True)) -> Response:
+    logger.info(f"clear session {session_id}")
     SESSION_MANAGER.clear_session(session_id)
     return Response(data=dict(status="ok"))
 
@@ -178,6 +182,7 @@ async def list_messages(session_id: str = Body(description="按照session_id过�
                         agent_id: str = Body(description="按照agent_id过滤message（所有agent_id发出或者收到的message），不传则不按照agent_id过滤",
                                              examples=["test_agent"], default=None),
                         limit: int = Body(default=10, description="限制返回的条数", examples=[10])) -> Response:
+    logger.info(f"list messages, session_id:{session_id}, agent_id:{agent_id}, limit:{limit}")
     messages: List[Message] = SESSION_MANAGER.get_history(_from=agent_id, to=agent_id, operator="or", session_id=session_id, limit=limit)
     return Response(data=messages)
 
@@ -185,6 +190,7 @@ async def list_messages(session_id: str = Body(description="按照session_id过�
 @app.post("/rule/update", tags=["rule"], description="更新规则", summary="更新规则")
 @try_wrapper
 async def update_rule(upload_file: UploadFile = File(description="更新文件, 支持后缀名jsonl")) -> Response:
+    logger.info("update rule file with upload file")
     with open(DEFAULT_RULE_PATH, "wb") as f:
         shutil.copyfileobj(upload_file.file, f)
     return Response(data=f"update rule file:{upload_file.filename} success!")

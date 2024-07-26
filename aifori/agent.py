@@ -40,7 +40,7 @@ class AIAgent(Agent):
         user = HumanAgent.from_config(id=user_id)
 
         system = self.system_template.format(agent_name=self.name, agent_desc=self.desc, user_name=user.name, user_desc=user.desc)
-        logger.debug(system)
+        logger.debug(f"{system=}")
         return system
 
     def _static_response(self, resp: str, stream: bool, **kwargs) -> Message:

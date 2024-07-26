@@ -53,10 +53,11 @@ class MessageORM(Base):
     def to_dict(self) -> dict:
         return {
             "id": self.id,
-            "content": self.content,
+            "session_id": self.session_id,
             "from_role": self.from_role,
-            "to_role": self.to_role,
             "from_id": self.from_id,
+            "content": self.content,
+            "to_role": self.to_role,
             "to_id": self.to_id,
             "create_datetime": self.create_datetime
         }

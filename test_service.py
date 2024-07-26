@@ -11,7 +11,6 @@ import os
 import click
 from loguru import logger
 from aifori.config import DATA_DIR, DEFAULT_AI_DESC, DEFAULT_AI_NAME, DEFAULT_MODEL, DEFAULT_USER_DESC, DEFAULT_USER_NAME
-from aifori.tts import play_voice
 from aifori.util import show_stream_content
 from snippets import set_logger
 from aifori.client import AiForiClient
@@ -19,7 +18,7 @@ from snippets import load
 
 set_logger("dev", __name__)
 
-HOST = "http://localhost:9001"
+HOST = "https://localhost:9001"
 AGENT_ID = "test_service_agent"
 USER_ID = "test_service_user"
 SESSION_ID = "test_service_session"
@@ -87,8 +86,6 @@ def test_agent():
     # 回答+朗读
     assistant_message, voice = client.chat_and_speak(agent_id=AGENT_ID, user_id=USER_ID, session_id=SESSION_ID, voice_config=user_voice_config,
                                                      dump_path=voice_path, play_local=DO_SPEAK, message=user_message, max_word=50)
-    if DO_SPEAK:
-        play_voice(voice_path)
     logger.info(f"{assistant_message.content=}")
 
 

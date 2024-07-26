@@ -1,4 +1,4 @@
 {
-    "HOST": "http://localhost:9001",
+    "HOST": "https://localhost:9001",
     "DO_SPEAK": true
 }

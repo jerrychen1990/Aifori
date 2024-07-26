@@ -7,14 +7,17 @@
 @Contact :   jerrychen1990@gmail.com
 '''
 
+import os
 from typing import List
 
 from sqlalchemy import and_, desc, or_
 from aifori.core import Message
+from aifori.config import AIFORI_ENV, LOG_HOME
 from aifori.db import DB, MessageORM
-
-
 from loguru import logger
+from snippets import set_logger, jdumps
+
+logger = set_logger(AIFORI_ENV, __name__,  std=False, log_dir=os.path.join(LOG_HOME, "session"))
 
 
 class SessionManager:
@@ -22,10 +25,10 @@ class SessionManager:
         orm_message = MessageORM(content=message.content, from_id=message.user_id, to_id=to_id, from_role=message.role,
                                  to_role=to_role, session_id=session_id)
 
-        logger.debug(f"add {orm_message=}")
         DB.add(orm_message)
         DB.commit()
         DB.refresh(orm_message)
+        logger.info(f"add message {jdumps(orm_message.to_dict(), indent=None)}")
 
     def get_history(self, _from: str | List[str] = None, to: str | List[str] = None, operator="and", session_id: str = None, limit=10) -> List[Message]:
         logger.debug(f"get history with {_from=}. {to=}, {session_id=}, {limit=}")
@@ -59,10 +62,9 @@ class SessionManager:
         return messages
 
     def clear_session(self, session_id: str):
-        logger.debug(f"clear session with {session_id=}")
+        logger.info(f"clear session with {session_id=}")
         DB.query(MessageORM).filter(MessageORM.session_id == session_id).delete()
         DB.commit()
-        # DB.refresh(MessageORM)
 
 
 SESSION_MANAGER = SessionManager()
