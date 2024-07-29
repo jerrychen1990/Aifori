@@ -8,8 +8,7 @@
 '''
 
 
-LLM_MODELS = ["glm-4-airx",  "glm-4-0520", "glm-4-flash"]
-
+LLM_MODELS = ["glm-4-airx",  "glm-4-0520", "glm-4-flash", "emohaa"]
 
 
 CHARACTER_MAP = {

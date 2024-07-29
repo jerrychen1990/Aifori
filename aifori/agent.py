@@ -10,31 +10,24 @@
 
 import copy
 from loguru import logger
+from aifori.config import DEFAULT_SYSTEM_TEMPLATE
 from aifori.core import Agent, AgentInfo, AssistantMessage, Message, StreamAssistantMessage, StreamMessage, UserMessage, Voice
 from aifori.memory import DBMemory, RawMemory
 from aifori.tts import tts
-from liteai.api import chat
+from liteai import api as liteai_api
 from aifori.rule import rule_match
 from aifori.session import SESSION_MANAGER
 
 
 class AIAgent(Agent):
+    role = "assistant"
+
     def __init__(self, model: str, voice_config: dict = {}, **kwargs):
         super().__init__(**kwargs)
-        self.role = "assistant"
         self.memory = DBMemory(agent_id=self.id)
         self.model = model
         self.voice_config = voice_config
-        self.system_template = """你是一个善解人意的聊天机器人，你需要参考**背景信息**和户聊天，聊天时需要遵守**聊天规范**
-**背景信息**
-你的名字:{agent_name}
-你的人设:{agent_desc}
-用户的名字:{user_name}
-用户的人设:{user_desc}
-
-**聊天规范**
-1.请简短、温和地和用户对话
-2.当用户问询你的名字时，请回答出你的名字"""
+        self.system_template = DEFAULT_SYSTEM_TEMPLATE
 
     def _build_system(self, user_id: str) -> str:
         user = HumanAgent.from_config(id=user_id)
@@ -68,12 +61,16 @@ class AIAgent(Agent):
         return self._dispatch(message=message, stream=stream, session_id=session_id, **kwargs)
 
     def _chat(self, message: UserMessage, stream=False, session_id=None, **kwargs) -> Message | StreamMessage:
+        user = HumanAgent.from_config(id=message.user_id)
         history = SESSION_MANAGER.get_history(_from=[self.id, message.user_id], to=[self.id, message.user_id], session_id=session_id)
+        meta = dict(user_info=user.desc, user_name=user.name, bot_info=self.desc, bot_name=self.name)
+
         system = self._build_system(user_id=message.user_id)
 
         messages = [dict(role="system", content=system)] + history + [message]
+        kwargs["handle_system"] = False
 
-        llm_resp = chat(model=self.model, messages=messages, stream=stream, **kwargs)
+        llm_resp = liteai_api.chat(model=self.model, messages=messages, stream=stream, meta=meta, **kwargs)
 
         if stream:
             return StreamAssistantMessage(content=llm_resp.content, user_id=self.id)

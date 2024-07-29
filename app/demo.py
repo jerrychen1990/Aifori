@@ -32,6 +32,7 @@ with st.sidebar.expander("Agent信息配置"):
     ai_desc = st.text_area("用户描述", DEFAULT_AI_DESC, height=100)
 
 model = st.sidebar.selectbox("模型", LLM_MODELS)
+# logger.info(f"{model=}")
 
 with st.sidebar.expander("音色配置"):
     character = st.selectbox("音色", CHARACTER_MAP.keys())
@@ -39,7 +40,7 @@ with st.sidebar.expander("音色配置"):
     speed = st.slider("语速", 0.5, 2.0, 1.0)
     pitch = st.slider("音调", -12, 12, 0, 1)
 
-clear = st.sidebar.button("新一轮对话")
+clear = st.sidebar.button("重置会话")
 autoplay = st.sidebar.checkbox("自动播放", value=False)
 
 
@@ -54,6 +55,13 @@ class SessionManager:
 
     def refresh(self):
         self.logger.info("refresh session manager")
+        # logger.info(f"{kwargs=}")
+        # locals().update(kwargs)
+        # logger.info(f"{locals().keys()=}")
+        # logger.info(f"{locals().get('model')=}")
+
+        # logger.info(f"inside model: {model}")
+
         self.client = AiForiClient(host=HOST)
         self.session_info = dict(agent_id=str(uuid.uuid4()), session_id=str(uuid.uuid4()), user_id=str(uuid.uuid4()))
         self.agent_id = self.session_info["agent_id"]
@@ -94,7 +102,10 @@ if not st.session_state.get("session_manager"):
 session_manager: SessionManager = st.session_state.session_manager
 
 if clear:
-    session_manager.refresh()
+    st.info("重置会话")
+    session_manager = SessionManager()
+    st.session_state.session_manager = session_manager
+    # session_manager.refresh(model=model)
 
 # Accept user input
 for message in session_manager.messages:
