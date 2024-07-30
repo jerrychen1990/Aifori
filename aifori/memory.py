@@ -11,12 +11,11 @@ import copy
 from typing import List
 
 
+from aifori.config import MEM_CONFIG
 from aifori.core import Memory, Message, Memory
 from liteai.core import Message
 from pydantic import Field
-
-
-# _MEM = mem0.Memory.from_config(MEM_CONFIG)
+import mem0
 
 
 class RawMemory(Memory):
@@ -40,6 +39,11 @@ class DBMemory(Memory):
 
     def to_llm_messages(self) -> List[Message]:
         return None
+
+
+# MEM = mem0.Memory()
+
+MEM = mem0.Memory.from_config(MEM_CONFIG)
 
 
 # class Mem0Memory(Memory):

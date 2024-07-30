@@ -39,7 +39,7 @@ MEM_CONFIG = {
             "host": "localhost",
             "port": 6333,
         }
-    },
+    }
 }
 
 # agent配置

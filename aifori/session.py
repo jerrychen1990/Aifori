@@ -14,13 +14,16 @@ from sqlalchemy import and_, desc, or_
 from aifori.core import Message
 from aifori.config import AIFORI_ENV, LOG_HOME
 from aifori.db import DB, MessageORM
+from aifori.task import add_message2memory
 from loguru import logger
 from snippets import set_logger, jdumps
+
 
 logger = set_logger(AIFORI_ENV, __name__,  std=False, log_dir=os.path.join(LOG_HOME, "session"))
 
 
 class SessionManager:
+
     def add_message(self, message: Message, to_id: str, to_role: str, session_id: str):
         orm_message = MessageORM(content=message.content, from_id=message.user_id, to_id=to_id, from_role=message.role,
                                  to_role=to_role, session_id=session_id)
@@ -29,6 +32,7 @@ class SessionManager:
         DB.commit()
         DB.refresh(orm_message)
         logger.info(f"add message {jdumps(orm_message.to_dict(), indent=None)}")
+        add_message2memory.delay(orm_message.to_dict())
 
     def get_history(self, _from: str | List[str] = None, to: str | List[str] = None, operator="and", session_id: str = None, limit=10) -> List[Message]:
         logger.debug(f"get history with {_from=}. {to=}, {session_id=}, {limit=}")

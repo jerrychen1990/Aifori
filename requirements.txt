@@ -13,3 +13,5 @@ mem0ai
 sqlalchemy
 click
 pydub
+celery
+redis

@@ -41,7 +41,9 @@ with st.sidebar.expander("音色配置"):
     pitch = st.slider("音调", -12, 12, 0, 1)
 
 clear = st.sidebar.button("重置会话")
-autoplay = st.sidebar.checkbox("自动播放", value=False)
+speak = st.sidebar.checkbox("播放音频", value=True)
+if speak:
+    autoplay = st.sidebar.checkbox("自动播放", value=False)
 
 
 class SessionManager:
@@ -129,13 +131,19 @@ if prompt := st.chat_input("你好，你是谁？"):
         # st.info(full_response)
         message_placeholder.markdown(full_response + "▌")
     message_placeholder.markdown(full_response)
-    voice_config = dict(voice_id=voice_id, speed=speed, pitch=pitch)
-    voice_path = session_manager.play_message(full_response, voice_config=voice_config)
-    first_voice_latency = time.time() - stt
-    video_duration = get_mp3_duration(voice_path)
+    full_token_latency = time.time() - stt
+    msg = f"返回[{len(full_response)}]字, 首字延时[{fist_token_latency: 2.3f}]s, 回复完成延时[{full_token_latency:2.3f}]s"
+    voice_path = None
 
-    st.audio(voice_path, format='audio/mp3', autoplay=autoplay)
-    st.info(f"返回[{len(full_response)}]字, 首字延时[{fist_token_latency:2.3f}]s, 音频延时[{first_voice_latency:2.3f}]s, 音频时长[{video_duration:2.1f}]s")
+    if speak:
+        voice_config = dict(voice_id=voice_id, speed=speed, pitch=pitch)
+        voice_path = session_manager.play_message(full_response, voice_config=voice_config)
+        first_voice_latency = time.time() - stt
+        video_duration = get_mp3_duration(voice_path)
+        st.audio(voice_path, format='audio/mp3', autoplay=autoplay)
+        msg += ", 音频延时[{first_voice_latency:2.3f}]s, 音频时长[{video_duration:2.1f}]s"
+
+    st.info(msg)
 
     user_message = {"role": "user", "content": prompt, "session_id": session_manager.session_id}
     assistant_message = {"role": "assistant", "content": full_response, "session_id": session_manager.session_id, "voice_path": voice_path}
