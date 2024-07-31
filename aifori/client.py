@@ -52,15 +52,37 @@ class AiForiClient(object):
         resp = self._do_request('/agent/create', json=data)
         return resp
 
-    def create_user(self, user_id: str, name: str, desc: str) -> dict:
-        data = {'id': user_id, 'name': name, 'desc': desc}
-        resp = self._do_request('/user/create', json=data)
+    def get_agent(self, agent_id: str):
+        data = {'id': agent_id}
+        resp = self._do_request('/agent/get', json=data)
         return resp
+
+    def get_or_create_agent(self, agent_id: str, name: str, desc: str, model: str, voice_config: dict = dict()) -> dict:
+        try:
+            return self.get_agent(agent_id)
+        except Exception as e:
+            return self.create_agent(agent_id, name, desc, model, voice_config)
 
     def delete_agent(self, agent_id: str) -> dict:
         data = {'id': agent_id}
         resp = self._do_request('/agent/delete', json=data)
         return resp
+
+    def create_user(self, user_id: str, name: str, desc: str) -> dict:
+        data = {'id': user_id, 'name': name, 'desc': desc}
+        resp = self._do_request('/user/create', json=data)
+        return resp
+
+    def get_user(self, user_id: str):
+        data = {'id': user_id}
+        resp = self._do_request('/user/get', json=data)
+        return resp
+
+    def get_or_create_user(self, user_id: str, name: str, desc: str) -> dict:
+        try:
+            return self.get_user(user_id)
+        except Exception as e:
+            return self.create_user(user_id, name, desc)
 
     def delete_user(self, user_id: str) -> dict:
         data = {'id': user_id}

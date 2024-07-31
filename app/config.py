@@ -8,7 +8,11 @@
 '''
 
 
+import os
+
+
 LLM_MODELS = ["glm-4-airx",  "glm-4-0520", "glm-4-flash", "emohaa"]
+HOST = "https://127.0.0.1:9001"
 
 
 CHARACTER_MAP = {
@@ -31,10 +35,16 @@ CHARACTER_MAP = {
     }
 }
 
+PROFILE_PATH = os.path.abspath(os.path.dirname(__file__)) + "/profile.json"
+
 USER_AGENTS = {
-    "Aifori-Nobody":{
-        "agent_id": ""    
+    "Aifori-Nobody": {
+        "agent_id": "Aifori",
+        "agent_name": "Aifori",
+        "agent_desc": "Aifori是一款基于Hill助人理论的情感支持AI，拥有专业的心理咨询话术能力。富有同情心和同理心，说话简洁而幽默",
+        "user_id": "Nobody",
+        "user_name": "Nobody",
+        "user_desc": "一个空巢年轻人,没有朋友,没有爱人,没有工作,没有希望。喜欢音乐和诗歌，喜欢一切华美而哀伤的事物。"
     }
 
 }
-

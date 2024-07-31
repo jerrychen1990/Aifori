@@ -67,18 +67,19 @@ class AIAgent(Agent):
         mems = "可供参考的历史记忆:\n" + "\n".join(mems)
         return mems
 
-    def _chat(self, message: UserMessage, stream=False, session_id=None, **kwargs) -> Message | StreamMessage:
+    def _chat(self, message: UserMessage, stream=False, session_id=None, recall_memory=False, **kwargs) -> Message | StreamMessage:
         user = HumanAgent.from_config(id=message.user_id)
         history = SESSION_MANAGER.get_history(_from=[self.id, message.user_id], to=[self.id, message.user_id], session_id=session_id)
         meta = dict(user_info=user.desc, user_name=user.name, bot_info=self.desc, bot_name=self.name)
 
         system = self._build_system(user_id=message.user_id)
-        mem = self._get_memory(message=message)
-        logger.debug(f"get {mem=}")
-        message = dict(role="user", content=mem+"\n"+message.content)
 
+        user_content = message.content
+        if recall_memory:
+            mem = self._get_memory(message=message)
+            user_content = mem+"\n"+user_content
+        message = dict(role="user", content=user_content)
         messages = [dict(role="system", content=system)] + history + [message]
-        # memory = self.memory.to_llm_messages()
 
         kwargs["handle_system"] = False
 
@@ -121,36 +122,10 @@ class AIAgent(Agent):
 
 
 class HumanAgent(Agent):
+    role = "user"
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.role = "user"
-
-
-# def call_lingxin(user_info: AgentInfo, agent_info: AgentInfo, model: str, messages: List[str], stream=True):
-#     api_key = os.environ["ZHIPU_API_KEY"]
-#     client = ZhipuAI(api_key=api_key)  # 填写您自己的APIKey
-#     meta = dict(user_info=user_info.desc, user_name=user_info.name, bot_info=agent_info.desc, bot_name=agent_info.name)
-#     logger.info(f"calling lingxin with: {meta=} {model=} {messages=}, {api_key=}")
-
-#     response = client.chat.completions.create(
-#         model=model,  # 填写需要调用的模型名称
-#         meta=meta,
-#         messages=messages,
-#         stream=stream
-#     )
-#     if not stream:
-#         return response.choices[0].message.content
-#     else:
-#         def _gen():
-#             acc = ""
-#             for chunk in response:
-#                 # print(chunk)
-#                 resp = chunk.choices[0].delta.content if chunk.choices[0].delta else ""
-#                 if resp:
-#                     yield resp
-#                     acc += resp
-#             logger.debug(f"streaming response :{acc}")
-#         return _gen()
 
 
 if __name__ == "__main__":

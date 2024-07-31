@@ -113,10 +113,11 @@ async def chat_agent(agent_id: str = Body(description="Agent的ID,唯一键", ex
                      user_id: str = Body(description="用户的ID,唯一键", examples=["test_user"]),
                      session_id: str = Body(description="对话的ID,唯一键", examples=["test_session"]),
                      message: str = Body(description="用户发送的消息", examples=["你好呀，你叫什么名字？"]),
-                     do_remember: bool = Body(default=True, description="Agent是否记忆这轮对话")) -> Response:
+                     do_remember: bool = Body(default=True, description="Agent是否记忆这轮对话"),
+                     recall_memory: bool = Body(default=False, description="是否唤起长期记忆")) -> Response:
     assistant = api.get_assistant(agent_id)
     user_message = UserMessage(content=message, user_id=user_id)
-    assistant_message = assistant.chat(message=user_message,  stream=False, temperature=0)
+    assistant_message = assistant.chat(message=user_message,  stream=False, temperature=0, recall_memory=recall_memory)
 
     if do_remember:
         SESSION_MANAGER.add_message(user_message, to_id=agent_id, to_role="assistant", session_id=session_id)
@@ -132,10 +133,11 @@ async def chat_agent_stream(agent_id: str = Body(description="Agent的ID,唯一�
                             user_id: str = Body(description="用户的ID,唯一键", examples=["test_user"]),
                             session_id: str = Body(default=None, description="对话的ID,唯一键"),
                             message: str = Body(description="用户发送的消息", examples=["你好呀，你叫什么名字？"]),
-                            do_remember: bool = Body(default=True, description="Agent是否记忆这轮对话")) -> StreamingResponse:
+                            do_remember: bool = Body(default=True, description="Agent是否记忆这轮对话"),
+                            recall_memory: bool = Body(default=False, description="是否唤起长期记忆")) -> StreamingResponse:
     assistant = api.get_assistant(agent_id)
     user_message = UserMessage(content=message, user_id=user_id)
-    assistant_message = assistant.chat(message=user_message,  stream=True)
+    assistant_message = assistant.chat(message=user_message,  stream=True, recall_memory=recall_memory, temperature=0)
 
     if do_remember:
         SESSION_MANAGER.add_message(user_message, to_id=agent_id, to_role="assistant", session_id=session_id)
