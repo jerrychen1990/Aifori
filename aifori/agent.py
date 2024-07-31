@@ -12,7 +12,7 @@ import copy
 from loguru import logger
 from aifori.config import DEFAULT_SYSTEM_TEMPLATE
 from aifori.core import Agent, AgentInfo, AssistantMessage, Message, StreamAssistantMessage, StreamMessage, UserMessage, Voice
-from aifori.memory import DBMemory, RawMemory
+from aifori.memory import MEM, DBMemory, RawMemory
 from aifori.tts import tts
 from liteai import api as liteai_api
 from aifori.rule import rule_match
@@ -60,14 +60,26 @@ class AIAgent(Agent):
     def chat(self, message: UserMessage, stream=False, session_id=None, **kwargs) -> Message | StreamMessage:
         return self._dispatch(message=message, stream=stream, session_id=session_id, **kwargs)
 
+    def _get_memory(self, message: UserMessage) -> str:
+        mems = MEM.search(query=message.content, user_id=message.user_id)
+        logger.debug(f"get {mems=}")
+        mems = [f"{idx}. {mem['text']}" for idx, mem in enumerate(mems, start=1)]
+        mems = "可供参考的历史记忆:\n" + "\n".join(mems)
+        return mems
+
     def _chat(self, message: UserMessage, stream=False, session_id=None, **kwargs) -> Message | StreamMessage:
         user = HumanAgent.from_config(id=message.user_id)
         history = SESSION_MANAGER.get_history(_from=[self.id, message.user_id], to=[self.id, message.user_id], session_id=session_id)
         meta = dict(user_info=user.desc, user_name=user.name, bot_info=self.desc, bot_name=self.name)
 
         system = self._build_system(user_id=message.user_id)
+        mem = self._get_memory(message=message)
+        logger.debug(f"get {mem=}")
+        message = dict(role="user", content=mem+"\n"+message.content)
 
         messages = [dict(role="system", content=system)] + history + [message]
+        # memory = self.memory.to_llm_messages()
+
         kwargs["handle_system"] = False
 
         llm_resp = liteai_api.chat(model=self.model, messages=messages, stream=stream, meta=meta, **kwargs)

@@ -1,0 +1,1 @@
+celery -A aifori.task worker --loglevel=info

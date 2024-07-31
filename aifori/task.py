@@ -11,11 +11,15 @@ app = Celery('task', broker='redis://localhost:6379/0')
 @app.task
 def add_message2memory(message: dict):
     logger.debug(f"executing task add message2memory with {message}")
-    user_id, agent_id = (message["from_id"], message["to_id"]) if message["from_role"] == "user" else (message["to_id"], message["from_id"])
-    logger.debug(f"add data={message['content']} {user_id=} {agent_id=} to mem")
+    mem_info = dict(data=message["content"])
+    if message["from_role"] == "user":
+        mem_info["user_id"] = message["from_id"]
+    else:
+        mem_info["agent_id"] = message["from_id"]
 
-    MEM.add(data=message["content"], user_id=user_id, agent_id=agent_id)
-    logger.debug("done")
+    logger.debug(f"add {mem_info=} to mem")
+    MEM.add(**mem_info)
+    logger.debug("add message to mem done")
 
 
 if __name__ == "__main__":

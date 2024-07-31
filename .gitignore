@@ -181,3 +181,4 @@ qdrant_storage/
 db/
 cert.pem
 key.pem
+dump.rdb
