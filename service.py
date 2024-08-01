@@ -18,7 +18,7 @@ from snippets import load, add_callback2gen, log_function_info, set_logger
 from hashlib import md5
 
 set_logger(AIFORI_ENV, __name__, log_dir=os.path.join(LOG_HOME, "service"), show_process=True)
-app = FastAPI()
+app = FastAPI(root_path="/api")
 
 
 class Response(BaseModel):

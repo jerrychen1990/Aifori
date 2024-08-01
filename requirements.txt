@@ -15,3 +15,4 @@ click
 pydub
 celery
 redis
+gtts
