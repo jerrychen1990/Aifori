@@ -12,7 +12,7 @@ import os
 
 
 LLM_MODELS = ["glm-4-airx",  "glm-4-0520", "glm-4-flash", "emohaa"]
-HOST = "https://127.0.0.1:9001"
+HOST = "http://127.0.0.1:9001"
 
 
 CHARACTER_MAP = {
