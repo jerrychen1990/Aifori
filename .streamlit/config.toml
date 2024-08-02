@@ -1,0 +1,6 @@
+[server]
+headless = true
+port = 9002  #
+enableCORS = false
+enableWebsocketCompression = false
+baseUrlPath="demo"

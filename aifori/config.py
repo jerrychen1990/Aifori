@@ -41,6 +41,8 @@ MEM_CONFIG = {
         }
     }
 }
+MEM_ON=False
+
 
 # agent配置
 DEFAULT_USER_NAME = "NoBody"
