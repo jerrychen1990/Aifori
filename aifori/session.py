@@ -12,7 +12,7 @@ from typing import List
 
 from sqlalchemy import and_, desc, or_
 from aifori.core import Message
-from aifori.config import AIFORI_ENV, LOG_HOME
+from aifori.config import AIFORI_ENV, LOG_HOME, MEM_ON
 from aifori.db import DB, MessageORM
 from aifori.task import add_message2memory
 from loguru import logger
@@ -32,7 +32,8 @@ class SessionManager:
         DB.commit()
         DB.refresh(orm_message)
         logger.info(f"add message {jdumps(orm_message.to_dict(), indent=None)}")
-        add_message2memory.delay(orm_message.to_dict())
+        if MEM_ON:
+            add_message2memory.delay(orm_message.to_dict())
 
     def get_history(self, _from: str | List[str] = None, to: str | List[str] = None, operator="and", session_id: str = None, limit=10) -> List[Message]:
         logger.debug(f"get history with {_from=}. {to=}, {session_id=}, {limit=}")

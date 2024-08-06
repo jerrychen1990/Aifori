@@ -13,10 +13,10 @@ from loguru import logger
 from aifori.config import DEFAULT_SYSTEM_TEMPLATE
 from aifori.core import Agent, AgentInfo, AssistantMessage, Message, StreamAssistantMessage, StreamMessage, UserMessage, Voice
 from aifori.memory import MEM, DBMemory, RawMemory
-from aifori.tts import tts
 from liteai import api as liteai_api
 from aifori.rule import rule_match
 from aifori.session import SESSION_MANAGER
+from liteai.api import tts
 
 
 class AIAgent(Agent):
@@ -98,9 +98,8 @@ class AIAgent(Agent):
             text = message.content
         else:
             text = message
-
-        voice_stream = tts(text=text, stream=stream, **speak_config)
-        return Voice(content=voice_stream)
+        voice = tts(text=text, model="speech-01-turbo", stream=stream, **kwargs)
+        return voice
 
     def get_config(self):
         config = super().get_config()

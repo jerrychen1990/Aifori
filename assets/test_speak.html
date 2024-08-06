@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html>
-	<head>
-		<meta charset="utf-8">
-		<title>Web Audio API 测试</title>
-	</head>
-	<body>
+<head>
+    <title>WebSocket Audio Player</title>
+</head>
+<body>
 		<table>
 			<tr>
 				<!-- <td>参数:</td>
@@ -18,68 +17,52 @@
 			</tr>
 
 		</table>
-	</body>
+</body>
+    <script>
+        var audioQueue = [];
+        var context = new (window.AudioContext || window.webkitAudioContext)();
+        var isPlaying = false;
 
-	<script>
-		//Web Audio API
-		var context;
-		try {
-			context = new(window.AudioContext || window.webkitAudioContext)();
-		} catch (e) {
-			alert('您当前的浏览器不支持Web Audio API ');
-		}
+        var objSocket = new WebSocket('ws://localhost:9001/agent/speak_stream');
+        objSocket.onopen = function(evt) {
+            onOpen(evt);
+        };
+        objSocket.onclose = function(evt) {
+            onClose(evt);
+        };
+        objSocket.onmessage = function(evt) {
+            onMessage(evt);
+        };
+        objSocket.onerror = function(evt) {
+            onError(evt);
+        };
 
+        function onOpen(evt) {
+            console.log("Connected to WebSocket server.");
+        }
 
-		//测试
-        var wsServer = "ws://localhost:9001/agent/speak_stream";
+        function onClose(evt) {
+            console.log("Disconnected");
+        }
 
-		/** 
-			WebSocket服务连接
-		*/
-		var objSocket = new WebSocket(wsServer);
-		objSocket.onopen = function(evt) {
-			onOpen(evt)
-		};
-		objSocket.onclose = function(evt) {
-			onClose(evt)
-		};
-		objSocket.onmessage = function(evt) {
-			onMessage(evt)
-		};
-		objSocket.onerror = function(evt) {
-			onError(evt)
-		};
+        function onError(evt) {
+            console.log('Error occurred: ' + evt.data);
+        }
 
-		function onOpen(evt) {
-			console.log("Connected to WebSocket server.");
-		}
+        function onMessage(evt) {
+            console.log('Retrieved data from server: ' + evt.data);
+            console.log('chunk size: ' + evt.data.length);
 
-		function onClose(evt) {
-			console.log("Disconnected");
-		}
+            var reader = new FileReader();
+            reader.readAsArrayBuffer(evt.data);
+            reader.onload = function() {
+                audioQueue.push(this.result);
+                if (!isPlaying) {
+                    playNextAudio();
+                }
+            };
+        }
 
-		function onError(evt) {
-			console.log('Error occured: ' + evt.data);
-		}
-
-		function onMessage(evt) { //websocket返回数据信息处理
-			console.log('Retrieved data from server: ' + evt.data);
-
-			var reader = new FileReader(); //文件阅读器
-			reader.readAsArrayBuffer(evt.data); //读取成ArrayBuffer对象
-			reader.onload = function() { //读取完毕
-				//解码
-				context.decodeAudioData(this.result, function(buffer) {
-					playSound(buffer);
-				}, function(e) {
-					"Error with decoding audio data" + e.err
-				});
-			}
-
-			//--------onMessage-----end-----------
-		}
-
-		//播放声音
 		function playSound(buffer) {
 			var source = context.createBufferSource(); // 创建一个声音源
 			source.buffer = buffer; // 告诉该源播放何物
@@ -104,9 +87,28 @@
             objSocket.send(JSON.stringify(message));
 		}
 
-		//关闭连接
-		function onCloseMessage() {
-			objSocket.close()
-		}
-	</script>
+
+        function playNextAudio() {
+            if (audioQueue.length === 0) {
+                isPlaying = false;
+                return;
+            }
+
+            isPlaying = true;
+            var audioData = audioQueue.shift();
+
+            context.decodeAudioData(audioData, function(buffer) {
+                var source = context.createBufferSource();
+                source.buffer = buffer;
+                source.connect(context.destination);
+                source.onended = function() {
+                    playNextAudio();
+                };
+                source.start(0);
+            }, function(e) {
+                console.error("Error with decoding audio data: " + e.err);
+                playNextAudio();
+            });
+        }
+    </script>
 </html>

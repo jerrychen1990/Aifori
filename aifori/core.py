@@ -14,6 +14,7 @@ from typing import Iterable, List
 from pydantic import BaseModel, Field
 from aifori.config import AGENT_DIR, SESSION_DIR
 from liteai.core import Message as LMessage
+from liteai.core import Voice
 import uuid
 from snippets import dump, load
 from loguru import logger
@@ -56,9 +57,9 @@ class Memory(BaseModel):
     #     raise NotImplementedError
 
 
-class Voice(BaseModel):
-    voice_file: str = Field(description="voice file path", default=None)
-    content: Iterable[bytes] = Field(description="voice content")
+# class Voice(BaseModel):
+#     voice_file: str = Field(description="voice file path", default=None)
+#     content: Iterable[bytes] = Field(description="voice content")
 
 
 class Agent:
@@ -99,7 +100,7 @@ class Agent:
     def from_config(cls, id: str):
         config_path = cls.get_config_path(id)
         if not os.path.exists(config_path):
-            raise FileNotFoundError(f"agent config for {id} not found!")
+            raise FileNotFoundError(f"{cls.role}'s config for {id} not found!")
         data = load(config_path)
         logger.debug(f"load agent from {config_path}")
         return cls(**data)

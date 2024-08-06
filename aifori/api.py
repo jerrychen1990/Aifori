@@ -8,7 +8,7 @@
 '''
 from aifori.agent import AIAgent, HumanAgent
 from aifori.config import *
-from aifori.core import Session
+from aifori.core import Session, Voice
 from snippets import load
 
 
@@ -77,3 +77,30 @@ def delete_user(user_id: str):
     if os.path.exists(config_path):
         logger.info(f"Delete assistant config file: {config_path}")
         os.remove(config_path)
+
+
+def speak_agent_stream(agent_id: str, message: str, voice_config: dict, chunk_size: int = 1024 * 10) -> Voice:
+    logger.info(f"agent {agent_id} speak {message} with {voice_config=}")
+    assistant = get_assistant(agent_id)
+    if not assistant:
+        raise Exception(f"agent:{agent_id} not found")
+    voice: Voice = assistant.speak(message=message, stream=True, **voice_config)
+
+    def chunk_stream(stream):
+        acc = b""
+        for chunk in stream:
+            acc += chunk
+            if len(acc) >= chunk_size:
+                yield acc[:chunk_size]
+                acc = acc[chunk_size:]
+        if acc:
+            yield acc
+
+    voice.byte_stream = chunk_stream(voice.byte_stream)
+
+    # def show(c):
+    #     logger.info(f"{type(c)}")
+    #     logger.info(f"{len(c)}")
+    #     return c
+    # voice.byte_stream = map(show, voice.byte_stream)
+    return voice

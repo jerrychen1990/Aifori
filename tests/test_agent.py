@@ -12,8 +12,9 @@ from aifori.agent import *
 from aifori.api import create_assistant, create_user, get_assistant
 from loguru import logger
 from aifori.config import *
-from aifori.tts import play_voice
 from snippets import set_logger
+from liteai.core import Voice
+from liteai.voice import play_voice
 
 
 class TestAgent(unittest.TestCase):
@@ -61,6 +62,5 @@ class TestAgent(unittest.TestCase):
     def test_speak(self):
         agent = get_assistant(self.agent_id)
         message = AssistantMessage(content="你好，我叫Aifori, 有什么能帮到你的么？", user_id=self.agent_id)
-        voice = agent.speak(message)
-        logger.info(f"{voice.content=}")
-        play_voice(voice.content)
+        voice: Voice = agent.speak(message)
+        play_voice(voice=voice)

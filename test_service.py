@@ -18,7 +18,7 @@ from snippets import load
 
 set_logger("dev", __name__)
 
-HOST = "https://localhost:9001"
+HOST = "http://localhost:9001"
 AGENT_ID = "test_service_agent"
 USER_ID = "test_service_user"
 SESSION_ID = "test_service_session"

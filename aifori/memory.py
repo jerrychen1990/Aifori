@@ -11,7 +11,6 @@ import copy
 from typing import List
 
 
-from aifori.config import MEM_CONFIG
 from aifori.core import Memory, Message, Memory
 from liteai.core import Message
 from pydantic import Field
@@ -41,9 +40,9 @@ class DBMemory(Memory):
         return None
 
 
-# MEM = mem0.Memory()
+MEM = mem0.Memory()
 
-MEM = mem0.Memory.from_config(MEM_CONFIG)
+# MEM = mem0.Memory.from_config(MEM_CONFIG)
 
 
 # class Mem0Memory(Memory):

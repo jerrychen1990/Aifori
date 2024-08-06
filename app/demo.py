@@ -14,7 +14,7 @@ import streamlit as st
 
 from aifori.client import AiForiClient
 from aifori.config import *
-from aifori.tts import get_mp3_duration
+from liteai.voice import get_duration
 from snippets import set_logger, load, dump
 from app.config import *
 
@@ -155,7 +155,7 @@ if prompt := st.chat_input("你好，你是谁？"):
         voice_config = dict(voice_id=voice_id, speed=speed, pitch=pitch)
         voice_path = session_manager.play_message(full_response, voice_config=voice_config)
         first_voice_latency = time.time() - stt
-        video_duration = get_mp3_duration(voice_path)
+        video_duration = get_duration(voice_path)
         st.audio(voice_path, format='audio/mp3', autoplay=autoplay)
         msg += f", 音频延时[{first_voice_latency:2.3f}]s, 音频时长[{video_duration:2.1f}]s"
 

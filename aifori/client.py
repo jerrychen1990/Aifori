@@ -12,12 +12,11 @@ import copy
 import json
 import os
 import time
-from typing import List, Tuple
+from typing import Iterable, List, Tuple
 import requests
 from aifori.core import AssistantMessage, Message, StreamAssistantMessage, Voice
 from loguru import logger
 
-from aifori.tts import dump_voice, play_voice
 import urllib3
 
 urllib3.disable_warnings()
@@ -110,17 +109,27 @@ class AiForiClient(object):
             resp = self._do_request('/agent/chat', json=data)
             return AssistantMessage.model_validate(resp)
 
-    def speak(self, agent_id: str, message: str, voice_config=dict(), max_word=None, play_local=True, dump_path=None):
+    def speak(self, agent_id: str, message: str, voice_config=dict(), max_word=None, play_local=True, dump_path: str = None, chunk_size=1024 * 10):
         message = message if max_word is None else message[:max_word]
-        voice = self._do_request('/agent/speak_stream', json={'agent_id': agent_id,
-                                                              'message': message, "voice_config": voice_config}, stream=True)
+        byte_stream: Iterable[bytes] = self._do_request('/agent/speak_stream', json={'agent_id': agent_id,
+                                                                                     'message': message, "voice_config": voice_config, "chunk_size": chunk_size}, stream=True)
 
-        if play_local:
-            voice = play_voice(voice)
-        if dump_path:
-            voice = dump_voice(voice, dump_path)
+        for items in byte_stream:
+            print(items)
+            logger.info(f"{len(items)=}")
 
-        return voice
+        # def show(c):
+        #     logger.info(f"{type(c)}")
+        #     logger.info(f"{len(c)}")
+        #     return c
+        # byte_stream = map(show, byte_stream)
+        # return byte_stream
+
+        # voice = build_voice(byte_stream=byte_stream, file_path=dump_path)
+
+        # if play_local:
+        #     voice = play_voice(voice)
+        # return voice
 
     def clear_session(self, session_id: str) -> dict:
         resp = self._do_request('/session/clear', json={'session_id': session_id})
