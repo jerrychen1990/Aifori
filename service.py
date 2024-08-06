@@ -2,8 +2,8 @@ from functools import wraps
 import itertools
 import json
 import shutil
-from fastapi import Body, FastAPI, File, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi import Body, FastAPI, File, UploadFile, WebSocket
+from fastapi.responses import HTMLResponse, StreamingResponse
 from aifori.agent import AIAgent, HumanAgent
 from aifori.session import SESSION_MANAGER
 from aifori.config import *
@@ -19,6 +19,7 @@ from hashlib import md5
 
 set_logger(AIFORI_ENV, __name__, log_dir=os.path.join(LOG_HOME, "service"), show_process=True)
 app = FastAPI(root_path="/api")
+# app = FastAPI()
 
 
 class Response(BaseModel):
@@ -203,3 +204,52 @@ async def update_rule(upload_file: UploadFile = File(description="更新文件, 
 async def update_rule() -> Response:
     rules = load(DEFAULT_RULE_PATH)
     return Response(data=rules)
+
+
+@app.get("/")
+async def get():
+    with open("assets/test_speak.html", "r", encoding="utf-8") as f:
+        html = f.read()
+    return HTMLResponse(html)
+
+
+@app.post("/agent/speak_stream", tags=["agent"], description="让Agent朗读文字, 流式返回")
+@try_wrapper
+async def speak_agent_stream(agent_id: str = Body(description="Agent的ID,唯一键", examples=["test_agent"]),
+                             message: str = Body(description="需要说出来的文字内容", examples=["你好呀，我的名字叫Aifori"]),
+                             voice_config: dict = Body(default=DEFAULT_VOICE_CONFIG, description="tts的配置")) -> StreamingResponse:
+    logger.info(f"agent {agent_id} speak {message} with {voice_config=}")
+    assistant = api.get_assistant(agent_id)
+    if not assistant:
+        raise Exception(f"agent:{agent_id} not found")
+    voice: Voice = assistant.speak(message=message, stream=True, **voice_config)
+    voice_path = os.path.join(VOICE_DIR, "tmp_speak", f"{agent_id}_{md5(''.encode()).hexdigest()}.mp3")
+    voice.content = add_callback2gen(items=voice.content, callback=dump_voice, path=voice_path)
+    logger.info(f"dump agent {agent_id} speak {message} to {voice_path}")
+    return StreamingResponse(voice.content, media_type="audio/mp3")
+
+
+@app.websocket("/agent/speak_stream")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        data = await websocket.receive_text()
+        logger.info(f"{data=}")
+        data = json.loads(data)
+        agent_id = data["agent_id"]
+        message = data["message"]
+        voice_config = data["voice_config"]
+
+        assistant = api.get_assistant(agent_id)
+        if not assistant:
+            raise Exception(f"agent:{agent_id} not found")
+        voice: Voice = assistant.speak(message=message, stream=True, **voice_config)
+        voice_path = os.path.join(VOICE_DIR, "tmp_speak", f"{agent_id}_{md5(''.encode()).hexdigest()}.mp3")
+        voice.content = add_callback2gen(items=voice.content, callback=dump_voice, path=voice_path)
+        logger.info(f"dump agent {agent_id} speak {message} to {voice_path}")
+        for chunk in voice.content:
+            await websocket.send_bytes(chunk)
+    except Exception as e:
+        logger.info(f"Connection closed: {e}")
+    finally:
+        await websocket.close()
