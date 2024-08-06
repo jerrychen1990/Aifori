@@ -17,9 +17,9 @@ import requests
 from aifori.core import AssistantMessage, Message, StreamAssistantMessage, Voice
 from loguru import logger
 
-import urllib3
+from liteai.voice import build_voice, play_voice
 
-urllib3.disable_warnings()
+# urllib3.disable_warnings()
 
 
 class AiForiClient(object):
@@ -94,7 +94,7 @@ class AiForiClient(object):
         perf = dict()
         if stream:
             resp = self._do_request('/agent/chat_stream', json=data, stream=True).iter_lines()
-            assistant_id = json.loads(next(resp).decode('utf-8'))["assistant_id"]
+            agent_id = data["agent_id"]
             # logger.debug(f"{assistant_id=}")
 
             def gen():
@@ -104,7 +104,7 @@ class AiForiClient(object):
                         # logger.debug(f"{chunk=}")
                         yield chunk
 
-            return StreamAssistantMessage(user_id=assistant_id, content=gen())
+            return StreamAssistantMessage(user_id=agent_id, content=gen())
         else:
             resp = self._do_request('/agent/chat', json=data)
             return AssistantMessage.model_validate(resp)
@@ -113,23 +113,13 @@ class AiForiClient(object):
         message = message if max_word is None else message[:max_word]
         byte_stream: Iterable[bytes] = self._do_request('/agent/speak_stream', json={'agent_id': agent_id,
                                                                                      'message': message, "voice_config": voice_config, "chunk_size": chunk_size}, stream=True)
+        byte_stream = byte_stream.iter_content(chunk_size=chunk_size)
 
-        for items in byte_stream:
-            print(items)
-            logger.info(f"{len(items)=}")
+        voice = build_voice(byte_stream=byte_stream, file_path=dump_path)
 
-        # def show(c):
-        #     logger.info(f"{type(c)}")
-        #     logger.info(f"{len(c)}")
-        #     return c
-        # byte_stream = map(show, byte_stream)
-        # return byte_stream
-
-        # voice = build_voice(byte_stream=byte_stream, file_path=dump_path)
-
-        # if play_local:
-        #     voice = play_voice(voice)
-        # return voice
+        if play_local:
+            voice = play_voice(voice)
+        return voice
 
     def clear_session(self, session_id: str) -> dict:
         resp = self._do_request('/session/clear', json={'session_id': session_id})

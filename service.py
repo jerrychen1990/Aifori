@@ -1,5 +1,4 @@
 from functools import wraps
-import itertools
 import json
 import shutil
 from fastapi import Body, FastAPI, File, UploadFile, WebSocket
@@ -152,9 +151,6 @@ async def chat_agent_stream(agent_id: str = Body(description="Agent的ID,唯一�
     content_stream = add_callback2gen(items=assistant_message.content, callback=stream2message)
     content_stream = batchify(content_stream, chunk_size)
     content_stream = (json.dumps(dict(chunk="".join(chunk)), ensure_ascii=False) + "\n" for chunk in content_stream)
-
-    content_stream = itertools.chain((json.dumps(dict(assistant_id=agent_id)) + "\n"), content_stream)
-
     return StreamingResponse(content_stream, media_type="application/x-ndjson")
 
 
@@ -198,6 +194,11 @@ async def speak_agent_stream(agent_id: str = Body(description="Agent的ID,唯一
                              voice_config: dict = Body(default=DEFAULT_VOICE_CONFIG, description="tts的配置"),
                              chunk_size: int = Body(default=1024 * 10, description="默认音频字节chunk大小")) -> StreamingResponse:
     voice = api.speak_agent_stream(agent_id, message, voice_config, chunk_size=chunk_size)
+
+    # def gen():
+    #     for chunk in voice.byte_stream:
+    #         logger.debug(f"send chunk: {len(chunk)}")
+    #         yield chunk
     return StreamingResponse(voice.byte_stream, media_type="audio/mp3")
 
 
