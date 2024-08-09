@@ -28,7 +28,7 @@ class UserMessage(Message):
     role: str = "user"
 
 
-class AssistantMessage(Message):
+class AgentMessage(Message):
     role: str = "assistant"
 
 
@@ -36,14 +36,14 @@ class StreamMessage(Message):
     content: Iterable[str] = Field(description="stream content")
 
 
-class StreamAssistantMessage(StreamMessage):
-    role: str = "assistant"
+class StreamAgentMessage(StreamMessage):
+    role: str = "agent"
 
 
 class AgentInfo(BaseModel):
-    name: str = Field(description="assistant name")
-    role: str = Field(description="assistant role")
-    desc: str = Field(description="assistant description")
+    name: str = Field(description="agent name")
+    role: str = Field(description="agent role")
+    desc: str = Field(description="agent description")
 
 
 class Memory(BaseModel):
@@ -53,16 +53,7 @@ class Memory(BaseModel):
     def to_llm_messages(self) -> List[Message]:
         raise NotImplementedError
 
-    # def to_json(self) -> dict:
-    #     raise NotImplementedError
-
-
-# class Voice(BaseModel):
-#     voice_file: str = Field(description="voice file path", default=None)
-#     content: Iterable[bytes] = Field(description="voice content")
-
-
-class Agent:
+class BaseUser:
     role = "UNK"
 
     def __init__(self, name: str, desc: str, id: str = None, *args, **kwargs):
@@ -92,7 +83,7 @@ class Agent:
     def save(self):
         config_path = self.get_config_path(self.id)
         config = self.get_config()
-        logger.info(f"save agent {config} to {config_path}")
+        logger.info(f"save {self.role}'s {config} to {config_path}")
         dump(config, config_path)
         return config_path
 
@@ -102,21 +93,21 @@ class Agent:
         if not os.path.exists(config_path):
             raise FileNotFoundError(f"{cls.role}'s config for {id} not found!")
         data = load(config_path)
-        logger.debug(f"load agent from {config_path}")
+        logger.debug(f"load {cls.role} from {config_path}")
         return cls(**data)
 
     @classmethod
     def delete(cls, id: str):
         config_path = cls.get_config_path(id)
         if os.path.exists(config_path):
-            logger.info(f"delete agent from {config_path}")
+            logger.info(f"delete {cls.role} from {config_path}")
             os.remove(config_path)
 
 
 class Session(BaseModel):
     id: str = Field(default_factory=uuid.uuid4, description="session id")
     history: list[Message] = Field(default_factory=list, description="session history")
-    assistant_info: AgentInfo = Field(description="assistant")
+    agent_info: AgentInfo = Field(description="agent")
     user_info: AgentInfo = Field(description="human ")
 
     class Config:

@@ -3,16 +3,16 @@ import json
 import shutil
 from fastapi import Body, FastAPI, File, UploadFile, WebSocket
 from fastapi.responses import HTMLResponse, StreamingResponse
-from aifori.agent import AIAgent, HumanAgent
+from aifori.agent import AIAgent, Human
 from aifori.session import SESSION_MANAGER
 from aifori.config import *
-from aifori.core import AssistantMessage, Message, UserMessage
+from aifori.core import Message, UserMessage
 from pydantic import BaseModel, Field
 from typing import Any, List
 
 import aifori.api as api
 from loguru import logger
-from snippets import load, add_callback2gen, log_function_info, set_logger, batchify
+from snippets import load, log_function_info, set_logger
 
 set_logger(AIFORI_ENV, __name__, log_dir=os.path.join(LOG_HOME, "service"), show_process=True)
 app = FastAPI(root_path="/api")
@@ -62,15 +62,15 @@ async def create_agent(
         desc: str = Body(default=DEFAULT_AI_DESC, description="Agent的描述"),
         model: str = Body(default=DEFAULT_MODEL, description="Agent使用的模型"),
         voice_config: dict = Body(default=DEFAULT_VOICE_CONFIG, description="Agent的音色配置")) -> Response:
-    assistant = api.create_assistant(id=id, name=name, desc=desc, model=model, exists_ok=False, do_save=True, voice_config=voice_config)
-    return Response(data=assistant.get_config())
+    agent = api.create_agent(id=id, name=name, desc=desc, model=model, exists_ok=False, do_save=True, voice_config=voice_config)
+    return Response(data=agent.get_config())
 
 
 @app.post("/agent/get", tags=["agent"], description="获取一个Agent")
 @try_wrapper
 async def get_agent(id: str = Body(description="Agent的ID,唯一键", examples=["test_agent"], embed=True)) -> Response:
-    assistant = api.get_assistant(id)
-    return Response(data=assistant.get_config())
+    agent = api.get_agent(id)
+    return Response(data=agent.get_config())
 
 
 @app.post("/agent/delete", tags=["agent"], description="删除一个Agent")
@@ -100,7 +100,7 @@ async def get_user(id: str = Body(description="USER的ID,唯一键", examples=["
 @app.post("/user/delete", tags=["user"], description="删除一个人类用户")
 @try_wrapper
 async def delete_user(id: str = Body(description="USER的ID,唯一键", examples=["test_user"], embed=True)) -> Response:
-    HumanAgent.delete(id)
+    Human.delete(id)
     return Response(data=dict(status="ok"))
 
 
@@ -113,43 +113,35 @@ async def chat_agent(agent_id: str = Body(description="Agent的ID,唯一键", ex
                      message: str = Body(description="用户发送的消息", examples=["你好呀，你叫什么名字？"]),
                      do_remember: bool = Body(default=True, description="Agent是否记忆这轮对话"),
                      recall_memory: bool = Body(default=False, description="是否唤起长期记忆")) -> Response:
-    assistant = api.get_assistant(agent_id)
+    agent = api.get_agent(agent_id)
     user_message = UserMessage(content=message, user_id=user_id)
-    assistant_message = assistant.chat(message=user_message,  stream=False, temperature=0, recall_memory=recall_memory)
+    agent_message = agent.chat(message=user_message,  stream=False, temperature=0, recall_memory=recall_memory)
 
     if do_remember:
-        SESSION_MANAGER.add_message(user_message, to_id=agent_id, to_role="assistant", session_id=session_id)
-        SESSION_MANAGER.add_message(assistant_message, to_id=user_id, to_role="user", session_id=session_id)
-    logger.info(f"agent {agent_id} reply {assistant_message} for user message:{user_message}")
+        SESSION_MANAGER.add_message(user_message, to_id=agent_id, to_role="agent", session_id=session_id)
+        SESSION_MANAGER.add_message(agent_message, to_id=user_id, to_role="user", session_id=session_id)
+    logger.info(f"agent {agent_id} reply {agent_message} for user message:{user_message}")
 
-    return Response(data=assistant_message)
+    return Response(data=agent_message)
+
+
+class ChatSpeakRequest(BaseModel):
+    agent_id: str = Field(description="Agent的ID,唯一键", examples=["test_agent"])
+    user_id: str = Field(description="用户的ID,唯一键", examples=["test_user"])
+    session_id: str = Field(default=None, description="对话的ID,唯一键")
+    message: str = Field(description="用户发送的消息", examples=["你好呀，你叫什么名字？"])
+    do_remember: bool = Field(default=True, description="Agent是否记忆这轮对话")
+    recall_memory: bool = Field(default=False, description="是否唤起长期记忆")
+    return_text: bool = Field(default=True, description="是否返回文字")
+    text_chunk_size: int = Field(default=8, description="返回的文字chunk(字符)的token大小")
+    voice_config: dict = Field(default=DEFAULT_VOICE_CONFIG, description="tts的配置"),
+    return_voice: bool = Field(default=False, description="是否返回音频")
+    voice_chunk_size: int = Field(default=2048 * 10, description="默认音频字节chunk(byte)大小, mp3格式")
 
 
 @app.post("/agent/chat_stream", tags=["agent"], description="和Agent进行对话, 流式")
 @try_wrapper
-async def chat_agent_stream(agent_id: str = Body(description="Agent的ID,唯一键", examples=["test_agent"]),
-                            user_id: str = Body(description="用户的ID,唯一键", examples=["test_user"]),
-                            session_id: str = Body(default=None, description="对话的ID,唯一键"),
-                            message: str = Body(description="用户发送的消息", examples=["你好呀，你叫什么名字？"]),
-                            do_remember: bool = Body(default=True, description="Agent是否记忆这轮对话"),
-                            recall_memory: bool = Body(default=False, description="是否唤起长期记忆"),
-                            chunk_size: int = Body(default=8, description="返回的chunk的token大小")) -> StreamingResponse:
-    assistant = api.get_assistant(agent_id)
-    user_message = UserMessage(content=message, user_id=user_id)
-    assistant_message = assistant.chat(message=user_message,  stream=True, recall_memory=recall_memory, temperature=0)
-
-    if do_remember:
-        SESSION_MANAGER.add_message(user_message, to_id=agent_id, to_role="assistant", session_id=session_id)
-
-    def stream2message(items):
-        content = "".join(items)
-        message = AssistantMessage(content=content, user_id=agent_id)
-        logger.info(f"agent {agent_id} reply {message} for user message:{user_message}")
-        if do_remember:
-            SESSION_MANAGER.add_message(message, to_id=user_id, to_role="user", session_id=session_id)
-
-    content_stream = add_callback2gen(items=assistant_message.content, callback=stream2message)
-    content_stream = batchify(content_stream, chunk_size)
+async def chat_agent_stream(req: ChatSpeakRequest = Body(description="请求体")) -> StreamingResponse:
     content_stream = (json.dumps(dict(chunk="".join(chunk)), ensure_ascii=False) + "\n" for chunk in content_stream)
     return StreamingResponse(content_stream, media_type="application/x-ndjson")
 
@@ -192,27 +184,54 @@ async def update_rule() -> Response:
 async def speak_agent_stream(agent_id: str = Body(description="Agent的ID,唯一键", examples=["test_agent"]),
                              message: str = Body(description="需要说出来的文字内容", examples=["你好呀，我的名字叫Aifori"]),
                              voice_config: dict = Body(default=DEFAULT_VOICE_CONFIG, description="tts的配置"),
-                             chunk_size: int = Body(default=1024 * 10, description="默认音频字节chunk大小")) -> StreamingResponse:
+                             chunk_size: int = Body(default=2048 * 10, description="默认音频字节chunk大小")) -> StreamingResponse:
     voice = api.speak_agent_stream(agent_id, message, voice_config, chunk_size=chunk_size)
-
-    # def gen():
-    #     for chunk in voice.byte_stream:
-    #         logger.debug(f"send chunk: {len(chunk)}")
-    #         yield chunk
     return StreamingResponse(voice.byte_stream, media_type="audio/mp3")
 
 
 @app.websocket("/agent/speak_stream")
-async def websocket_endpoint(websocket: WebSocket):
+async def ws_speak_agent_stream(websocket: WebSocket):
     await websocket.accept()
     try:
         data = await websocket.receive_text()
         logger.debug(f"websocket {data=}")
         data = json.loads(data)
         voice = api.speak_agent_stream(**data)
-        for chunk in voice.byte_stream:
-            logger.debug(f"send chunk with size {len(chunk)}")
-            await websocket.send_bytes(chunk)
+        chunks = voice.byte_stream
+        for chunk in chunks:
+            b_chunk = chunk
+            logger.debug(f"send chunk with size {len(b_chunk)}, {type(b_chunk)=}, {b_chunk[:5]=}")
+
+            await websocket.send_bytes(b_chunk)
+
+    except Exception as e:
+        logger.info(f"Connection closed: {e}")
+    finally:
+        await websocket.close()
+
+
+# @app.post("/agent/chat_speak_stream", tags=["agent"], description="让Agent回复文字、语音")
+# @try_wrapper
+# async def speak_agent_stream(req: ChatSpeakRequest = Body(description="请求体")) -> StreamingResponse:
+#     voice = api.speak_agent_stream(agent_id, message, voice_config, chunk_size=chunk_size)
+#     return StreamingResponse(voice.byte_stream, media_type="application/x-ndjson")
+
+
+@app.websocket("/agent/chat_speak")
+async def ws_chat_agent_stream(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        data = await websocket.receive_text()
+        logger.debug(f"websocket {data=}")
+        data = json.loads(data)
+        voice = api.speak_agent_stream(**data)
+        chunks = voice.byte_stream
+        for chunk in chunks:
+            b_chunk = chunk
+            logger.debug(f"send chunk with size {len(b_chunk)}, {type(b_chunk)=}, {b_chunk[:5]=}")
+
+            await websocket.send_bytes(b_chunk)
+
     except Exception as e:
         logger.info(f"Connection closed: {e}")
     finally:

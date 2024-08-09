@@ -23,7 +23,7 @@
         var context = new (window.AudioContext || window.webkitAudioContext)();
         var isPlaying = false;
 
-        var objSocket = new WebSocket('ws://localhost:9001/agent/speak_stream');
+        var objSocket = new WebSocket('ws://localhost:9100/const/speak_stream');
         objSocket.onopen = function(evt) {
             onOpen(evt);
         };
@@ -51,7 +51,7 @@
 
         function onMessage(evt) {
             console.log('Retrieved data from server: ' + evt.data);
-            console.log('chunk size: ' + evt.data.length);
+            // console.log('chunk size: ' + getByteLength(evt.data));
 
             var reader = new FileReader();
             reader.readAsArrayBuffer(evt.data);

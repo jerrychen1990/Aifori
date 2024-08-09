@@ -148,4 +148,4 @@ CREATE TABLE IF NOT EXISTS MESSAGE(
 if __name__ == "__main__":
     pass
     # init_db()
-    # add_message(AssistantMessage(user_id="123",  content="789"))
+    # add_message(AgentMessage(user_id="123",  content="789"))

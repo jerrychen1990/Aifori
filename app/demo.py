@@ -134,8 +134,8 @@ for message in session_manager.messages:
 if prompt := st.chat_input("你好，你是谁？"):
     with st.chat_message("user"):
         st.markdown(prompt)
-    # Display assistant response in chat message container
-    with st.chat_message("assistant"):
+    # Display agent response in chat message container
+    with st.chat_message("agent"):
         message_placeholder = st.empty()
         full_response = ""
 
@@ -162,9 +162,9 @@ if prompt := st.chat_input("你好，你是谁？"):
     st.info(msg)
 
     user_message = {"role": "user", "content": prompt, "session_id": session_manager.session_id}
-    assistant_message = {"role": "assistant", "content": full_response, "session_id": session_manager.session_id, "voice_path": voice_path}
+    agent_message = {"role": "agent", "content": full_response, "session_id": session_manager.session_id, "voice_path": voice_path}
 
     session_manager.add_message(user_message)
-    session_manager.add_message(assistant_message)
+    session_manager.add_message(agent_message)
 
     session_manager.round += 1

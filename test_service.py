@@ -58,25 +58,25 @@ def test_agent():
     user_message = "你好,你叫什么名字?"
     # client.speak(agent_id=AGENT_ID, message=user_message, voice_config=user_voice_config)
     # 批式回答
-    assistant_message = client.chat(agent_id=AGENT_ID, user_id=USER_ID, message=user_message, session_id=SESSION_ID, stream=False, do_remember=True)
-    logger.info(f"{assistant_message.content=}")
-    assert "aifori" in assistant_message.content.lower()
+    agent_message = client.chat(agent_id=AGENT_ID, user_id=USER_ID, message=user_message, session_id=SESSION_ID, stream=False, do_remember=True)
+    logger.info(f"{agent_message.content=}")
+    assert "aifori" in agent_message.content.lower()
     if DO_SPEAK:
-        client.speak(agent_id=AGENT_ID, message=assistant_message.content, max_word=50)
+        client.speak(agent_id=AGENT_ID, message=agent_message.content, max_word=50)
 
     # round2
     user_message = "你知道我叫什么吗"
-    assistant_message = client.chat(agent_id=AGENT_ID, user_id=USER_ID, message=user_message, session_id=SESSION_ID, stream=False, do_remember=True)
-    logger.info(f"{assistant_message.content=}")
+    agent_message = client.chat(agent_id=AGENT_ID, user_id=USER_ID, message=user_message, session_id=SESSION_ID, stream=False, do_remember=True)
+    logger.info(f"{agent_message.content=}")
     if DO_SPEAK:
-        client.speak(agent_id=AGENT_ID, message=assistant_message.content, max_word=50, voice_config=user_voice_config)
+        client.speak(agent_id=AGENT_ID, message=agent_message.content, max_word=50, voice_config=user_voice_config)
 
     # round3
     user_message = "列出三位诗人"
     # client.speak(agent_id=AGENT_ID, message=user_message, voice_config=user_voice_config)
     # 流式回答
-    assistant_message = client.chat(agent_id=AGENT_ID, user_id=USER_ID, message=user_message, session_id=SESSION_ID, stream=True, do_remember=True)
-    content = show_stream_content(assistant_message.content)
+    agent_message = client.chat(agent_id=AGENT_ID, user_id=USER_ID, message=user_message, session_id=SESSION_ID, stream=True, do_remember=True)
+    content = show_stream_content(agent_message.content)
     if DO_SPEAK:
         client.speak(agent_id=AGENT_ID, message=content, max_word=50)
 
@@ -84,9 +84,9 @@ def test_agent():
     user_message = "第二位是哪个朝代的"
     # client.speak(agent_id=AGENT_ID, message=user_message, voice_config=user_voice_config)
     # 回答+朗读
-    assistant_message, voice = client.chat_and_speak(agent_id=AGENT_ID, user_id=USER_ID, session_id=SESSION_ID, voice_config=user_voice_config,
+    agent_message, voice = client.chat_and_speak(agent_id=AGENT_ID, user_id=USER_ID, session_id=SESSION_ID, voice_config=user_voice_config,
                                                      dump_path=voice_path, play_local=DO_SPEAK, message=user_message, max_word=50)
-    logger.info(f"{assistant_message.content=}")
+    logger.info(f"{agent_message.content=}")
 
 
 def clean_up():
@@ -99,14 +99,14 @@ def test_rule():
     client.update_rule(rule_path=os.path.join(DATA_DIR, "rule/rule_old.jsonl"))
     # round1
     user_message = "你好呀,你叫什么名字"
-    assistant_message = client.chat(agent_id=AGENT_ID, user_id=USER_ID, message=user_message, session_id=SESSION_ID, stream=False, do_remember=False)
-    logger.info(f"{assistant_message.content=}")
-    assert "你好呀，我叫Aifori，很高兴认识你！" == assistant_message.content
+    agent_message = client.chat(agent_id=AGENT_ID, user_id=USER_ID, message=user_message, session_id=SESSION_ID, stream=False, do_remember=False)
+    logger.info(f"{agent_message.content=}")
+    assert "你好呀，我叫Aifori，很高兴认识你！" == agent_message.content
 
     client.update_rule(rule_path=os.path.join(DATA_DIR, "rule/rule_new.jsonl"))
     user_message = "我叫神尼名字"
-    assistant_message = client.chat(agent_id=AGENT_ID, user_id=USER_ID, message=user_message, session_id=SESSION_ID, stream=True, do_remember=False)
-    content = show_stream_content(assistant_message.content)
+    agent_message = client.chat(agent_id=AGENT_ID, user_id=USER_ID, message=user_message, session_id=SESSION_ID, stream=True, do_remember=False)
+    content = show_stream_content(agent_message.content)
     logger.info(f"{content=}")
     assert "你叫Nobody" == content
 

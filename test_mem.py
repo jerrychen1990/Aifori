@@ -18,12 +18,12 @@ logger = set_logger("DEV", __name__)
 # os.environ['OPENAI_API_KEY'] = 'sk-xxx'
 
 
-class PersonalTravelAssistant:
+class PersonalTravelAgent:
     def __init__(self):
         self.client = OpenAI()
         self.memory = Memory()
         # self.memory.reset()
-        self.messages = [{"role": "system", "content": "You are a personal AI Assistant."}]
+        self.messages = [{"role": "system", "content": "You are a personal AI Agent."}]
 
     def ask_question(self, question, user_id):
         # Fetch previous related memories
@@ -40,7 +40,7 @@ class PersonalTravelAssistant:
             messages=self.messages
         )
         answer = response.choices[0].message.content
-        self.messages.append({"role": "assistant", "content": answer})
+        self.messages.append({"role": "agent", "content": answer})
 
         # Store the question in memory
         self.memory.add(question, user_id=user_id)
@@ -57,7 +57,7 @@ class PersonalTravelAssistant:
 
 # Usage example
 user_id = "traveler_1"
-ai_assistant = PersonalTravelAssistant()
+ai_assistant = PersonalTravelAgent()
 
 
 def main():

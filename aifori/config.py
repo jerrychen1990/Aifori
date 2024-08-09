@@ -1,8 +1,6 @@
 from os import curdir
 import os
-import sys
 from loguru import logger
-from snippets.logs import LoguruFormat
 
 # 文件配置
 AIFORI_ENV = os.getenv("AIFORI_ENV", "dev").upper()
@@ -55,6 +53,9 @@ DEFAULT_MODEL = "GLM-4-Air"
 
 DEFAULT_VOICE_CONFIG = dict(voice_id="tianxin_xiaoling", speed=1, pitch=0)
 
+DEFAULT_TEXT_CHUNK_SIZE=10
+DEFAULT_VOICE_CHUNK_SIZE=2048*10
+
 DEFAULT_SYSTEM_TEMPLATE = """你是一个善解人意的聊天机器人，你需要参考**背景信息**和户聊天，聊天时需要遵守**聊天规范**
 **背景信息**
 你的名字:{agent_name}
@@ -67,34 +68,37 @@ DEFAULT_SYSTEM_TEMPLATE = """你是一个善解人意的聊天机器人，你需
 2.当用户问询你的名字时，请回答出你的名字"""
 
 
+# LiteAI配置
+LITE_AI_LOG_LEVEL = "INFO"
+
 # 日志配置
 
 LOG_HOME = os.getenv("AIFORI_LOG_HOME", os.path.join(AIFORI_HOME, "logs"))
 os.makedirs(LOG_HOME, exist_ok=True)
 
-STD_FMT = LoguruFormat.DETAIL if AIFORI_ENV == "DEV" else LoguruFormat.SIMPLE
-STD_LEVEL = "DEBUG" if AIFORI_ENV == "DEV" else "INFO"
-def MODULE_FILTER(record): return __name__ in record["name"]
-def SERVICE_FILTER(record): return "service" in record["name"]
+# STD_FMT = LoguruFormat.DETAIL if AIFORI_ENV == "DEV" else LoguruFormat.SIMPLE
+# STD_LEVEL = "DEBUG" if AIFORI_ENV == "DEV" else "INFO"
+# def MODULE_FILTER(record): return __name__ in record["name"]
+# def SERVICE_FILTER(record): return "service" in record["name"]
 
 
-FILE_RETENTION = "7 days" if AIFORI_ENV == "DEV" else "30 days"
+# FILE_RETENTION = "7 days" if AIFORI_ENV == "DEV" else "30 days"
 
-handlers = {
-    "aifori_std": dict(sink=sys.stdout, format=STD_FMT, colorize=True, level=STD_LEVEL, filter=lambda x: MODULE_FILTER(x) or SERVICE_FILTER(x), enqueue=True),
-    "aifori_output": dict(sink=os.path.join(LOG_HOME, "aifori_output.log"), format=LoguruFormat.File_SIMPLE, level="INFO",
-                          filter=MODULE_FILTER, enqueue=True, backtrace=True, colorize=True, rotation="00:00", retention=FILE_RETENTION),
-    "aifori_service_out": dict(sink=os.path.join(LOG_HOME, "service_output.log"), format=LoguruFormat.File_SIMPLE, level="INFO",
-                               filter=SERVICE_FILTER, enqueue=True, backtrace=True, colorize=True, rotation="00:00", retention=FILE_RETENTION)
-}
-if AIFORI_ENV == "DEV":
-    handlers.update({
-        "aifori_detail": dict(sink=os.path.join(LOG_HOME, "aifori_detail.log"), format=LoguruFormat.FILE_DETAIL, level="DEBUG",
-                              filter=MODULE_FILTER, enqueue=True, backtrace=True, colorize=True, rotation="00:00", retention=FILE_RETENTION),
-        "aifori_detail": dict(sink=os.path.join(LOG_HOME, "service_detail.log"), format=LoguruFormat.FILE_DETAIL, level="DEBUG",
-                              filter=SERVICE_FILTER, enqueue=True, backtrace=True, colorize=True, rotation="00:00", retention=FILE_RETENTION),
-    })
+# handlers = {
+#     "aifori_std": dict(sink=sys.stdout, format=STD_FMT, colorize=True, level=STD_LEVEL, filter=lambda x: MODULE_FILTER(x) or SERVICE_FILTER(x), enqueue=True),
+#     "aifori_output": dict(sink=os.path.join(LOG_HOME, "aifori_output.log"), format=LoguruFormat.File_SIMPLE, level="INFO",
+#                           filter=MODULE_FILTER, enqueue=True, backtrace=True, colorize=True, rotation="00:00", retention=FILE_RETENTION),
+#     "aifori_service_out": dict(sink=os.path.join(LOG_HOME, "service_output.log"), format=LoguruFormat.File_SIMPLE, level="INFO",
+#                                filter=SERVICE_FILTER, enqueue=True, backtrace=True, colorize=True, rotation="00:00", retention=FILE_RETENTION)
+# }
+# if AIFORI_ENV == "DEV":
+#     handlers.update({
+#         "aifori_detail": dict(sink=os.path.join(LOG_HOME, "aifori_detail.log"), format=LoguruFormat.FILE_DETAIL, level="DEBUG",
+#                               filter=MODULE_FILTER, enqueue=True, backtrace=True, colorize=True, rotation="00:00", retention=FILE_RETENTION),
+#         "aifori_detail": dict(sink=os.path.join(LOG_HOME, "service_detail.log"), format=LoguruFormat.FILE_DETAIL, level="DEBUG",
+#                               filter=SERVICE_FILTER, enqueue=True, backtrace=True, colorize=True, rotation="00:00", retention=FILE_RETENTION),
+#     })
 
-LOG_CONFIG = {
-    "handlers": handlers
-}
+# LOG_CONFIG = {
+#     "handlers": handlers
+# }

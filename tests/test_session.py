@@ -28,12 +28,12 @@ class TestSession(unittest.TestCase):
         SESSION_MANAGER.clear_session(self.session_id)
 
         SESSION_MANAGER.add_message(message=UserMessage(user_id=USER_ID, content="你好"),
-                                    to_id=AGENT_ID, to_role="assistant", session_id=self.session_id)
-        SESSION_MANAGER.add_message(message=AssistantMessage(user_id=AGENT_ID, content="你好呀，我叫Aifori"),
+                                    to_id=AGENT_ID, to_role="agent", session_id=self.session_id)
+        SESSION_MANAGER.add_message(message=AgentMessage(user_id=AGENT_ID, content="你好呀，我叫Aifori"),
                                     to_id=USER_ID, to_role="user", session_id=self.session_id)
         SESSION_MANAGER.add_message(message=UserMessage(user_id=AGENT_ID, content="1+1=2吗"),
-                                    to_id=USER_ID, to_role="assistant", session_id=self.session_id)
-        SESSION_MANAGER.add_message(message=AssistantMessage(user_id=USER_ID, content="是的，1+1=2"),
+                                    to_id=USER_ID, to_role="agent", session_id=self.session_id)
+        SESSION_MANAGER.add_message(message=AgentMessage(user_id=USER_ID, content="是的，1+1=2"),
                                     to_id=AGENT_ID, to_role="user", session_id=self.session_id)
 
         messages = SESSION_MANAGER.get_history(_from=[USER_ID, AGENT_ID], to=[USER_ID, AGENT_ID], limit=10)

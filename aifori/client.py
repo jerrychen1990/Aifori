@@ -14,7 +14,7 @@ import os
 import time
 from typing import Iterable, List, Tuple
 import requests
-from aifori.core import AssistantMessage, Message, StreamAssistantMessage, Voice
+from aifori.core import AgentMessage, Message, StreamAgentMessage, Voice
 from loguru import logger
 
 from liteai.voice import build_voice, play_voice
@@ -88,14 +88,14 @@ class AiForiClient(object):
         resp = self._do_request('/user/delete', json=data)
         return resp
 
-    def chat(self,  stream=True, **kwargs) -> StreamAssistantMessage | AssistantMessage:
+    def chat(self,  stream=True, **kwargs) -> StreamAgentMessage | AgentMessage:
         data = copy.copy(kwargs)
         st = time.time()
         perf = dict()
         if stream:
             resp = self._do_request('/agent/chat_stream', json=data, stream=True).iter_lines()
             agent_id = data["agent_id"]
-            # logger.debug(f"{assistant_id=}")
+            # logger.debug(f"{agent_id=}")
 
             def gen():
                 for chunk in resp:
@@ -104,15 +104,16 @@ class AiForiClient(object):
                         # logger.debug(f"{chunk=}")
                         yield chunk
 
-            return StreamAssistantMessage(user_id=agent_id, content=gen())
+            return StreamAgentMessage(user_id=agent_id, content=gen())
         else:
             resp = self._do_request('/agent/chat', json=data)
-            return AssistantMessage.model_validate(resp)
+            return AgentMessage.model_validate(resp)
 
     def speak(self, agent_id: str, message: str, voice_config=dict(), max_word=None, play_local=True, dump_path: str = None, chunk_size=1024 * 10):
         message = message if max_word is None else message[:max_word]
-        byte_stream: Iterable[bytes] = self._do_request('/agent/speak_stream', json={'agent_id': agent_id,
-                                                                                     'message': message, "voice_config": voice_config, "chunk_size": chunk_size}, stream=True)
+        byte_stream: Iterable[bytes] = self._do_request('/agent/speak_stream',
+                                                        json={'agent_id': agent_id,
+                                                              'message': message, "voice_config": voice_config, "chunk_size": chunk_size}, stream=True)
         byte_stream = byte_stream.iter_content(chunk_size=chunk_size)
 
         voice = build_voice(byte_stream=byte_stream, file_path=dump_path)
@@ -126,7 +127,7 @@ class AiForiClient(object):
         return resp
 
     def chat_and_speak(self, session_id: str, agent_id: str, user_id: str, message: str, voice_config=dict(),
-                       do_remember=True, max_word=None, play_local=True, dump_path: str = None) -> Tuple[AssistantMessage, Voice]:
+                       do_remember=True, max_word=None, play_local=True, dump_path: str = None) -> Tuple[AgentMessage, Voice]:
         resp_message: Message = self.chat(agent_id=agent_id, user_id=user_id, message=message,
                                           stream=False, do_remember=do_remember, session_id=session_id)
         logger.debug(f"{resp_message=}")
