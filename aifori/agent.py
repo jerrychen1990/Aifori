@@ -10,9 +10,9 @@
 
 import copy
 from loguru import logger
-from aifori.config import DEFAULT_SYSTEM_TEMPLATE, LITE_AI_LOG_LEVEL
-from aifori.core import BaseUser, AgentInfo, AgentMessage, Message, StreamAgentMessage, StreamMessage, UserMessage, Voice
-from aifori.memory import MEM, DBMemory, RawMemory
+from aifori.config import *
+from aifori.core import *
+from aifori.memory import MEM, DBMemory
 from liteai import api as liteai_api
 from aifori.rule import rule_match
 from aifori.session import SESSION_MANAGER
@@ -20,7 +20,7 @@ from liteai.api import tts
 
 
 class AIAgent(BaseUser):
-    role = "agent"
+    role = "assistant"
 
     def __init__(self, model: str, voice_config: dict = {}, **kwargs):
         super().__init__(**kwargs)
@@ -38,8 +38,8 @@ class AIAgent(BaseUser):
 
     def _static_response(self, resp: str, stream: bool, **kwargs) -> Message:
         if stream:
-            return StreamAgentMessage(content=(e for e in resp), user_id=self.id)
-        return AgentMessage(content=resp, user_id=self.id)
+            return StreamAssistantMessage()(content=(e for e in resp), user_id=self.id)
+        return AssistantMessage(content=resp, user_id=self.id)
 
     def _dispatch(self, message: UserMessage, **kwargs):
         match_rules = rule_match(query=message.content, match_all=False, regex=True)
@@ -86,11 +86,11 @@ class AIAgent(BaseUser):
         llm_resp = liteai_api.chat(model=self.model, messages=messages, stream=stream, meta=meta, **kwargs, log_level=LITE_AI_LOG_LEVEL)
 
         if stream:
-            return StreamAgentMessage(content=llm_resp.content, user_id=self.id)
+            return StreamAssistantMessage(content=llm_resp.content, user_id=self.id)
         else:
-            return AgentMessage(content=llm_resp.content, user_id=self.id)
+            return AssistantMessage(content=llm_resp.content, user_id=self.id)
 
-    def speak(self, message: Message | str, stream=True, **kwargs) -> Voice:
+    def speak(self, message: Message | str, stream=True, voice_path: str = None, **kwargs) -> Voice:
         speak_config = copy.copy(self.voice_config)
         speak_config.update(**kwargs)
 
@@ -98,7 +98,7 @@ class AIAgent(BaseUser):
             text = message.content
         else:
             text = message
-        voice = tts(text=text, model="speech-01-turbo", stream=stream, **kwargs)
+        voice = tts(text=text, model="speech-01-turbo", stream=stream, tgt_path=voice_path, **kwargs, log_level=LITE_AI_LOG_LEVEL)
         return voice
 
     def get_config(self):
@@ -113,7 +113,7 @@ class AIAgent(BaseUser):
                 for chunk in message.content:
                     yield chunk
                     acc += chunk
-                self.memory.add_message(AgentMessage(content=acc, user_id=self.id))
+                self.memory.add_message(AssistantMessage(content=acc, user_id=self.id))
             return StreamMessage(content=_gen(), user_id=self.id, role=self.role)
         else:
             self.memory.add_message(message)
@@ -125,27 +125,3 @@ class Human(BaseUser):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-
-if __name__ == "__main__":
-    user = Human(agent_info=AgentInfo(name="张三", desc="30岁的男性软件工程师，兴趣包括阅读、徒步和编程", role="user"), memory=None)
-    memory = RawMemory(
-        history=[
-            {
-                "role": "agent",
-                "content": "你好，我是Emohaa，很高兴见到你。请问有什么我可以帮忙的吗？"
-            },
-            {
-                "role": "user",
-                "content": "最近我感觉压力很大，情绪总是很低落。"
-            },
-            {
-                "role": "agent",
-                "content": "听起来你最近遇到了不少挑战。可以具体说说是什么让你感到压力大吗？"
-            }]
-    )
-    agent = AIAgent(agent_info=AgentInfo(
-        name="Emohaa", desc="Emohaa是一款基于Hill助人理论的情感支持AI，拥有专业的心理咨询话术能力。能够和对方共情、安慰，并且记得对方说的所有话", role="agent"), memory=memory)
-
-    resp = agent.chat(message=UserMessage(content="最近我感觉压力很大，情绪总是很低落。", name="张三"))
-    print(resp)

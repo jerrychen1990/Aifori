@@ -39,7 +39,7 @@ MEM_CONFIG = {
         }
     }
 }
-MEM_ON=False
+MEM_ON = False
 
 
 # agent配置
@@ -53,8 +53,10 @@ DEFAULT_MODEL = "GLM-4-Air"
 
 DEFAULT_VOICE_CONFIG = dict(voice_id="tianxin_xiaoling", speed=1, pitch=0)
 
-DEFAULT_TEXT_CHUNK_SIZE=10
-DEFAULT_VOICE_CHUNK_SIZE=2048*10
+DEFAULT_TTS_TEXT_CHUNK_SIZE = 32
+DEFAULT_TEXT_CHUNK_SIZE = 10
+DEFAULT_VOICE_CHUNK_SIZE = 4096*10
+
 
 DEFAULT_SYSTEM_TEMPLATE = """你是一个善解人意的聊天机器人，你需要参考**背景信息**和户聊天，聊天时需要遵守**聊天规范**
 **背景信息**
