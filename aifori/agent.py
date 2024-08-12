@@ -38,7 +38,7 @@ class AIAgent(BaseUser):
 
     def _static_response(self, resp: str, stream: bool, **kwargs) -> Message:
         if stream:
-            return StreamAssistantMessage()(content=(e for e in resp), user_id=self.id)
+            return StreamAssistantMessage(content=(e for e in resp), user_id=self.id)
         return AssistantMessage(content=resp, user_id=self.id)
 
     def _dispatch(self, message: UserMessage, **kwargs):

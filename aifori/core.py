@@ -10,10 +10,11 @@
 
 from abc import abstractmethod
 import os
-from typing import Iterable, List
+from token import OP
+from typing import Iterable, List, Optional
 from pydantic import BaseModel, Field
 from aifori.config import AGENT_DIR, DEFAULT_TEXT_CHUNK_SIZE, DEFAULT_TTS_TEXT_CHUNK_SIZE, DEFAULT_VOICE_CHUNK_SIZE, DEFAULT_VOICE_CONFIG
-from liteai.core import Message as LMessage
+from liteai.core import LLMGenConfig, Message as LMessage
 from liteai.core import Voice
 import uuid
 from snippets import dump, load
@@ -108,12 +109,13 @@ class ChatRequest(BaseModel):
     message: str = Field(description="用户发送的消息", examples=["你好呀，你叫什么名字？"])
     do_remember: bool = Field(default=False, description="Agent是否记忆这轮对话")
     recall_memory: bool = Field(default=False, description="是否唤起长期记忆")
+    llm_gen_config: LLMGenConfig = Field(default=LLMGenConfig(), description="llm的配置")
 
 
 class SpeakRequest(BaseModel):
     assistant_id: str = Field(description="AIAgent的ID,唯一键", examples=["test_assistant"])
     message: str = Field(description="用户发送的消息", examples=["你好呀，你叫什么名字？"])
-    voice_path: str = Field(default=None, description="音频文件存储路径")
+    voice_path: Optional[str] = Field(default=None, description="音频文件存储路径", examples=[None])
     voice_config: dict = Field(default=DEFAULT_VOICE_CONFIG, description="tts的配置")
     voice_chunk_size: int = Field(default=DEFAULT_VOICE_CHUNK_SIZE, description="默认音频字节chunk(byte)大小, mp3格式")
 
@@ -125,4 +127,4 @@ class ChatSpeakRequest(ChatRequest):
     return_voice: bool = Field(default=False, description="是否返回音频")
     tts_text_chunk_size: int = Field(default=DEFAULT_TTS_TEXT_CHUNK_SIZE, description="积累多少个字符请求一次tts")
     voice_chunk_size: int = Field(default=DEFAULT_VOICE_CHUNK_SIZE, description="默认音频字节chunk(byte)大小, mp3格式")
-    voice_path: str = Field(default=None, description="音频文件存储路径")
+    voice_path: Optional[str] = Field(default=None, description="音频文件存储路径", examples=[None])

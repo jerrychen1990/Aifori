@@ -5,7 +5,7 @@ from fastapi import Body, FastAPI, File, UploadFile, WebSocket
 from fastapi.responses import HTMLResponse, StreamingResponse
 from aifori.session import SESSION_MANAGER
 from aifori.config import *
-from aifori.core import AssistantMessage, Message, ChatRequest, SpeakRequest, StreamAssistantMessage
+from aifori.core import AssistantMessage, ChatSpeakRequest, Message, ChatRequest, SpeakRequest, StreamAssistantMessage
 from pydantic import BaseModel, Field
 from typing import Any, List
 
@@ -123,6 +123,7 @@ async def chat_assistant_stream(req: ChatRequest = Body(description="请求体")
 @app.post("/assistant/speak_stream", tags=["assistant"], description="assistant返回文本对应的语音,sse流式")
 @try_wrapper
 async def speak_assistant_stream(req: SpeakRequest = Body(description="请求体")) -> StreamingResponse:
+    req.voice_path = os.path.join(VOICE_DIR, req.voice_path) if req.voice_path else None
     voice: Voice = api.speak_assistant(req, stream=True)
     content_stream = (jdumps(dict(voice_chunk=chunk), indent=None) + "\n" for chunk in voice.byte_stream)
     return StreamingResponse(content_stream, media_type="application/x-ndjson")
@@ -138,6 +139,32 @@ async def ws_speak_assistant_stream(websocket: WebSocket):
         voice: Voice = api.speak_assistant(req, stream=True)
         for chunk in voice.byte_stream:
             b_chunk = jdumps(dict(voice_chunk=chunk), indent=None).encode("utf-8")
+            await websocket.send_bytes(b_chunk)
+    except Exception as e:
+        logger.info(f"Connection closed: {e}")
+    finally:
+        await websocket.close()
+
+
+@app.post("/assistant/chat_speak_stream", tags=["assistant"], description="assistant返回文本以及对应的语音,sse流式")
+@try_wrapper
+async def chat_speak_assistant_stream(req: ChatSpeakRequest = Body(description="请求体")) -> StreamingResponse:
+    req.voice_path = os.path.join(VOICE_DIR, req.voice_path) if req.voice_path else None
+    dict_stream = api.chat_speak_assistant(req)
+    content_stream = (jdumps(chunk, indent=None) + "\n" for chunk in dict_stream)
+    return StreamingResponse(content_stream, media_type="application/x-ndjson")
+
+
+@app.websocket("/assistant/chat_speak_stream")
+async def ws_chat_speak_assistant_stream(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        req = await websocket.receive_text()
+        logger.debug(f"websocket {req=}")
+        req = ChatSpeakRequest.model_validate(json.loads(req))
+        dict_stream = api.chat_speak_assistant(req, stream=True)
+        for chunk in dict_stream:
+            b_chunk = jdumps(chunk, indent=None).encode("utf-8")
             await websocket.send_bytes(b_chunk)
     except Exception as e:
         logger.info(f"Connection closed: {e}")
@@ -173,68 +200,9 @@ async def update_rule(upload_file: UploadFile = File(description="更新文件, 
 
 @app.post("/rule/list", tags=["rule"], description="列出规则", summary="列出规则")
 @try_wrapper
-async def update_rule() -> Response:
+async def list_rule() -> Response:
     rules = load(DEFAULT_RULE_PATH)
     return Response(data=rules)
-
-
-@app.post("/assistant/speak_stream", tags=["assistant"], description="让assistant朗读文字, 流式返回")
-@try_wrapper
-async def speak_assistant_stream(assistant_id: str = Body(description="assistant的ID,唯一键", examples=["test_assistant"]),
-                                 message: str = Body(description="需要说出来的文字内容", examples=["你好呀，我的名字叫Aifori"]),
-                                 voice_config: dict = Body(default=DEFAULT_VOICE_CONFIG, description="tts的配置"),
-                                 chunk_size: int = Body(default=2048 * 10, description="默认音频字节chunk大小")) -> StreamingResponse:
-    voice = api.speak_assistant_stream(assistant_id, message, voice_config, chunk_size=chunk_size)
-    return StreamingResponse(voice.byte_stream, media_type="audio/mp3")
-
-
-@app.websocket("/assistant/speak_stream")
-async def ws_speak_assistant_stream(websocket: WebSocket):
-    await websocket.accept()
-    try:
-        data = await websocket.receive_text()
-        logger.debug(f"websocket {data=}")
-        data = json.loads(data)
-        voice = api.speak_assistant_stream(**data)
-        chunks = voice.byte_stream
-        for chunk in chunks:
-            b_chunk = chunk
-            logger.debug(f"send chunk with size {len(b_chunk)}, {type(b_chunk)=}, {b_chunk[:5]=}")
-
-            await websocket.send_bytes(b_chunk)
-
-    except Exception as e:
-        logger.info(f"Connection closed: {e}")
-    finally:
-        await websocket.close()
-
-
-# @app.post("/assistant/chat_speak_stream", tags=["assistant"], description="让assistant回复文字、语音")
-# @try_wrapper
-# async def speak_assistant_stream(req: ChatSpeakRequest = Body(description="请求体")) -> StreamingResponse:
-#     voice = api.speak_assistant_stream(assistant_id, message, voice_config, chunk_size=chunk_size)
-#     return StreamingResponse(voice.byte_stream, media_type="application/x-ndjson")
-
-
-@app.websocket("/assistant/chat_speak")
-async def ws_chat_assistant_stream(websocket: WebSocket):
-    await websocket.accept()
-    try:
-        data = await websocket.receive_text()
-        logger.debug(f"websocket {data=}")
-        data = json.loads(data)
-        voice = api.speak_assistant_stream(**data)
-        chunks = voice.byte_stream
-        for chunk in chunks:
-            b_chunk = chunk
-            logger.debug(f"send chunk with size {len(b_chunk)}, {type(b_chunk)=}, {b_chunk[:5]=}")
-
-            await websocket.send_bytes(b_chunk)
-
-    except Exception as e:
-        logger.info(f"Connection closed: {e}")
-    finally:
-        await websocket.close()
 
 
 @app.get("/index")

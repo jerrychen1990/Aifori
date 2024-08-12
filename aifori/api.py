@@ -85,7 +85,8 @@ def chat_assistant(chat_request: ChatRequest, stream=True, **kwargs) -> Assistan
     user_message = UserMessage(content=chat_request.message, user_id=user.id)
     session_id = chat_request.session_id
     assistant_message = assistant.chat(
-        message=user_message,  stream=stream, session_id=session_id, recall_memory=chat_request.recall_memory, **kwargs)
+        message=user_message,  stream=stream, session_id=session_id, recall_memory=chat_request.recall_memory,
+        **chat_request.llm_gen_config.model_dump(), **kwargs)
     do_remember = chat_request.do_remember
     if do_remember:
         SESSION_MANAGER.add_message(user_message, to_id=assistant.id, to_role="agent", session_id=session_id)
@@ -126,7 +127,7 @@ def chat_speak_assistant(req: ChatSpeakRequest) -> Iterable[dict]:
 
     def _chat(buffer: Buffer):
         agent_message: StreamAssistantMessage = assistant.chat(
-            message=user_message,  stream=True, session_id=session_id, recall_memory=req.recall_memory, temperature=0)
+            message=user_message,  stream=True, session_id=session_id, recall_memory=req.recall_memory, **req.llm_gen_config.model_dump())
         if req.do_remember:
             SESSION_MANAGER.add_message(user_message, to_id=assistant_id, to_role="agent", session_id=session_id)
         for chunk in agent_message.content:

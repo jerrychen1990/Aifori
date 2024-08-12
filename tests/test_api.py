@@ -14,6 +14,7 @@ from aifori.api import *
 from aifori.core import ChatRequest
 # from aifori.client import handle_chat_stream
 from aifori.util import show_message
+from liteai.core import LLMGenConfig
 from liteai.voice import play_file, play_voice
 from snippets.logs import set_logger
 
@@ -57,8 +58,8 @@ class APITestCase(unittest.TestCase):
         create_assistant(name=self.assistant_id, desc=self.assistant_id, id=self.assistant_id, model=DEFAULT_MODEL, do_save=True)
         voice_path = "./tmp/ut_test_api_speak.mp3"
 
-        req = SpeakRequest(assistant_id=self.assistant_id, message="你好，我叫Aifori，有什么可以帮你的么", voice_path=voice_path)
-        voice = speak_assistant(req, stream=True)
+        req = SpeakRequest(assistant_id=self.assistant_id, message="你好，我叫Aifori，有什么可以帮你的么")
+        voice: Voice = speak_assistant(req, stream=True, voice_path=voice_path)
         logger.info(f"{voice.file_path=}")
         play_voice(voice)
         assert os.path.exists(voice.file_path)
@@ -66,9 +67,9 @@ class APITestCase(unittest.TestCase):
 
         voice_path = "./tmp/ut_test_api_speak_reply.mp3"
 
-        req = SpeakRequest(assistant_id=self.assistant_id, message="你好，我是Nobody", voice_path=voice_path,
+        req = SpeakRequest(assistant_id=self.assistant_id, message="你好，我是Nobody",
                            voice_config=dict(voice_id="junlang_nanyou", speed=.6, pitch=-4))
-        voice = speak_assistant(req, stream=False)
+        voice: Voice = speak_assistant(req, stream=False, voice_path=voice_path)
         logger.info(f"{voice.file_path=}")
         assert os.path.exists(voice.file_path)
         play_voice(voice)
@@ -92,8 +93,8 @@ class APITestCase(unittest.TestCase):
         server_voice_path = "./tmp/ut_test_api_chat_speak_server.mp3"
         local_voice_path = "./tmp/ut_test_api_chat_speak_local.mp3"
         req = ChatSpeakRequest(assistant_id=self.assistant_id, user_id=self.user_id, session_id=self.session_id,
-                               message="作一首古诗", stream=True, do_remember=False, return_text=True, return_voice=return_voice,
-                               voice_path=server_voice_path)
+                               message="作一首五言绝句", stream=True, do_remember=False, return_text=True, return_voice=return_voice,
+                               voice_path=server_voice_path, llm_gen_config=LLMGenConfig(max_tokens=16))
 
         resp = chat_speak_assistant(req)
         message, voice = decode_chunks(resp, req.assistant_id, return_voice, local_voice_path)
