@@ -5,7 +5,7 @@ from fastapi import Body, FastAPI, File, UploadFile, WebSocket
 from fastapi.responses import HTMLResponse, StreamingResponse
 from aifori.session import SESSION_MANAGER
 from aifori.config import *
-from aifori.core import AssistantMessage, ChatSpeakRequest, Message, ChatRequest, SpeakRequest, StreamAssistantMessage
+from aifori.core import AssistantMessage, ChatSpeakRequest, Message, ChatRequest, SpeakRequest
 from pydantic import BaseModel, Field
 from typing import Any, List
 
@@ -115,7 +115,7 @@ async def chat_assistant(req: ChatRequest = Body(description="请求体")) -> Re
 @app.post("/assistant/chat_stream", tags=["assistant"], description="和Assistant进行对话,可以返回语音,sse流式")
 @try_wrapper
 async def chat_assistant_stream(req: ChatRequest = Body(description="请求体")) -> StreamingResponse:
-    message: StreamAssistantMessage = api.chat_assistant(req, stream=True)
+    message: AssistantMessage = api.chat_assistant(req, stream=True)
     content_stream = (jdumps(dict(text_chunk=chunk), indent=None) + "\n" for chunk in message.content)
     return StreamingResponse(content_stream, media_type="application/x-ndjson")
 

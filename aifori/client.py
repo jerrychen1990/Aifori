@@ -13,9 +13,10 @@ import os
 from typing import Iterable, List, Tuple
 import requests
 from aifori.api import decode_chunks
-from aifori.core import AssistantMessage, ChatRequest, ChatSpeakRequest, Message, SpeakRequest, StreamAssistantMessage, Voice
+from aifori.core import AssistantMessage, ChatRequest, ChatSpeakRequest, Message, SpeakRequest
 from loguru import logger
 
+from liteai.core import Voice
 from liteai.voice import build_voice, play_voice
 
 # urllib3.disable_warnings()
@@ -87,7 +88,7 @@ class AiForiClient(object):
         resp = self._do_request('/user/delete', json=data)
         return resp
 
-    def chat(self, chat_request: ChatRequest, stream=True) -> StreamAssistantMessage | AssistantMessage:
+    def chat(self, chat_request: ChatRequest, stream=True) -> AssistantMessage:
         data = chat_request.model_dump()
         if stream:
             resp = self._do_request('/assistant/chat_stream', json=data, stream=True).iter_lines()
@@ -99,7 +100,7 @@ class AiForiClient(object):
                         chunk = json.loads(chunk.decode('utf-8'))["text_chunk"]
                         yield chunk
 
-            return StreamAssistantMessage(user_id=assistant_id, content=gen())
+            return AssistantMessage(user_id=assistant_id, content=gen())
         else:
             resp = self._do_request('/assistant/chat', json=data)
             return AssistantMessage.model_validate(resp)
@@ -115,7 +116,7 @@ class AiForiClient(object):
             voice = play_voice(voice)
         return voice
 
-    def chat_speak_stream(self, chat_speak_request: ChatSpeakRequest, local_voice_path: str = None, play: bool = False) -> Tuple[StreamAssistantMessage, Voice]:
+    def chat_speak_stream(self, chat_speak_request: ChatSpeakRequest, local_voice_path: str = None, play: bool = False) -> Tuple[AssistantMessage, Voice]:
         resp = self._do_request('/assistant/chat_speak_stream', json=chat_speak_request.model_dump(), stream=True).iter_lines()
         resp = (json.loads(item.decode("utf-8")) for item in resp)
         # resp = map(lambda e: logger.info(e), resp)
@@ -134,7 +135,7 @@ class AiForiClient(object):
         resp = self._do_request('/message/list', json={'assistant_id': assistant_id, 'session_id': session_id, 'limit': limit})
         return [Message.model_validate(message) for message in resp]
 
-    def update_rule(self, rule_path) -> str:
+    def update_rule(self, rule_path: str) -> str:
         if not os.path.exists(rule_path):
             raise FileNotFoundError(f"{rule_path} not found")
         if not rule_path.endswith(".jsonl"):

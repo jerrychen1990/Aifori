@@ -11,7 +11,7 @@ import os
 from typing import List
 
 from sqlalchemy import and_, desc, or_
-from aifori.core import Message
+from aifori.core import AssistantMessage, Message
 from aifori.config import AIFORI_ENV, LOG_HOME, MEM_ON
 from aifori.db import DB, MessageORM
 from aifori.task import add_message2memory
@@ -24,9 +24,12 @@ logger = set_logger(AIFORI_ENV, __name__,  std=False, log_dir=os.path.join(LOG_H
 
 class SessionManager:
 
-    def add_message(self, message: Message, to_id: str, to_role: str, session_id: str):
-        orm_message = MessageORM(content=message.content, from_id=message.user_id, to_id=to_id, from_role=message.role,
-                                 to_role=to_role, session_id=session_id)
+    def add_message(self, message: Message, from_id: str, to_id: str, to_role: str, session_id: str):
+        message_info = dict(content=message.content, from_id=from_id, to_id=to_id, from_role=message.role,
+                            to_role=to_role, session_id=session_id)
+        if isinstance(message, AssistantMessage):
+            message_info["tool_calls"] = jdumps(message.tool_calls)
+        orm_message = MessageORM(**message_info)
 
         DB.add(orm_message)
         DB.commit()

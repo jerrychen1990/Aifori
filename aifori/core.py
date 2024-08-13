@@ -8,21 +8,14 @@
 '''
 
 
-from abc import abstractmethod
 import os
-from token import OP
-from typing import Iterable, List, Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field
 from aifori.config import AGENT_DIR, DEFAULT_TEXT_CHUNK_SIZE, DEFAULT_TTS_TEXT_CHUNK_SIZE, DEFAULT_VOICE_CHUNK_SIZE, DEFAULT_VOICE_CONFIG
-from liteai.core import LLMGenConfig, Message as LMessage
-from liteai.core import Voice
+from liteai.core import LLMGenConfig, Message, ToolCall
 import uuid
 from snippets import dump, load
 from loguru import logger
-
-
-class Message(LMessage):
-    user_id: str = Field(description="user的id")
 
 
 class UserMessage(Message):
@@ -31,14 +24,11 @@ class UserMessage(Message):
 
 class AssistantMessage(Message):
     role: str = "assistant"
+    tool_calls: Optional[List[ToolCall]] = Field(default=None, description="tool calls")
 
-
-class StreamMessage(Message):
-    content: Iterable[str] = Field(description="stream content")
-
-
-class StreamAssistantMessage(StreamMessage):
-    role: str = "assistant"
+    @property
+    def is_stream(self):
+        return not isinstance(self.content, str)
 
 
 class Memory(BaseModel):
@@ -56,18 +46,6 @@ class BaseUser:
         self.id = id if id else str(uuid.uuid4())
         self.name = name
         self.desc = desc
-
-    @abstractmethod
-    def chat(self, message: Message, stream=False, **kwargs) -> Message | StreamMessage:
-        raise NotImplementedError
-
-    @abstractmethod
-    def speak(self, message: Message, stream=False, **kwargs) -> Voice:
-        raise NotImplementedError
-
-    @abstractmethod
-    def remember(self, message):
-        raise NotImplementedError
 
     def get_config(self):
         return dict(name=self.name, desc=self.desc, id=self.id, role=self.role)

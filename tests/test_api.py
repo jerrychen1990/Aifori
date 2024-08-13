@@ -38,28 +38,26 @@ class APITestCase(unittest.TestCase):
         user = create_user(name=self.user_id, desc=self.user_id, id=self.user_id, do_save=True)
         self.assertIsNotNone(user)
 
-    def test_chat_assistant(self):
+    def test_chat_assistant3(self):
         create_assistant(name=self.assistant_id, desc=self.assistant_id, id=self.assistant_id, model=DEFAULT_MODEL, do_save=True)
         create_user(name=self.user_id, desc=self.user_id, id=self.user_id, do_save=True)
 
         req = ChatRequest(assistant_id=self.assistant_id, user_id=self.user_id, session_id=self.session_id,
                           message="你好，你叫什么名字", do_remember=True)
         message = chat_assistant(req, stream=False)
-        self.assertIsInstance(message, AssistantMessage)
         show_message(message)
         assert "ut_assistant" in message.content.lower()
         req = ChatRequest(assistant_id=self.assistant_id, user_id=self.user_id, session_id=self.session_id,
                           message="作一首古诗", do_remember=True)
         message = chat_assistant(req, stream=True)
-        self.assertIsInstance(message, StreamAssistantMessage)
         show_message(message)
 
     def test_speak_assistant(self):
         create_assistant(name=self.assistant_id, desc=self.assistant_id, id=self.assistant_id, model=DEFAULT_MODEL, do_save=True)
         voice_path = "./tmp/ut_test_api_speak.mp3"
 
-        req = SpeakRequest(assistant_id=self.assistant_id, message="你好，我叫Aifori，有什么可以帮你的么")
-        voice: Voice = speak_assistant(req, stream=True, voice_path=voice_path)
+        req = SpeakRequest(assistant_id=self.assistant_id, message="你好，我叫Aifori，有什么可以帮你的么", voice_path=voice_path)
+        voice: Voice = speak_assistant(req, stream=True)
         logger.info(f"{voice.file_path=}")
         play_voice(voice)
         assert os.path.exists(voice.file_path)
@@ -68,8 +66,8 @@ class APITestCase(unittest.TestCase):
         voice_path = "./tmp/ut_test_api_speak_reply.mp3"
 
         req = SpeakRequest(assistant_id=self.assistant_id, message="你好，我是Nobody",
-                           voice_config=dict(voice_id="junlang_nanyou", speed=.6, pitch=-4))
-        voice: Voice = speak_assistant(req, stream=False, voice_path=voice_path)
+                           voice_config=dict(voice_id="junlang_nanyou", speed=.6, pitch=-4), voice_path=voice_path)
+        voice: Voice = speak_assistant(req, stream=False)
         logger.info(f"{voice.file_path=}")
         assert os.path.exists(voice.file_path)
         play_voice(voice)
@@ -105,6 +103,18 @@ class APITestCase(unittest.TestCase):
 
         assert os.path.exists(server_voice_path)
         play_file(server_voice_path)
+
+    def test_rule_chat(self):
+        # 测试规则问答
+        create_assistant(name=self.assistant_id, desc=self.assistant_id, id=self.assistant_id, model=DEFAULT_MODEL, do_save=True)
+        create_user(name=self.user_id, desc=self.user_id, id=self.user_id, do_save=True)
+
+        req = ChatRequest(assistant_id=self.assistant_id, user_id=self.user_id, session_id=self.session_id,
+                          message="我叫神尼名字", do_remember=False)
+        message = chat_assistant(req, stream=True)
+
+        message = show_message(message)
+        self.assertEquals("你叫Nobody", message)
 
     def test_clear10(self):
         delete_assistant(id=self.assistant_id)

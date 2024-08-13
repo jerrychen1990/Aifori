@@ -40,6 +40,7 @@ class MessageORM(Base):
     to_role = Column(String, index=True)
     from_id = Column(String, index=True)
     to_id = Column(String, index=True)
+    tool_calls = Column(String)
     create_datetime = Column(DateTime, default=datetime.datetime.now())
 
     @classmethod

@@ -60,6 +60,8 @@ def set_up():
 def test_assistant():
 
     # round1
+    client.clear_session(session_id=SESSION_ID)
+
     user_message = "你好,你叫什么名字?"
     # 批式回答
     req = ChatRequest(assistant_id=ASSISTANT_ID, user_id=USER_ID, message=user_message,

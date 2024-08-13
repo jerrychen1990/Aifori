@@ -14,7 +14,7 @@ from aifori.session import SESSION_MANAGER
 
 
 USER_ID = "ut_user"
-AGENT_ID = "ut_agent"
+ASSISTANT_ID = "ut_agent"
 logger = set_logger("dev", __name__)
 
 
@@ -27,28 +27,29 @@ class TestSession(unittest.TestCase):
     def test_message(self):
         SESSION_MANAGER.clear_session(self.session_id)
 
-        SESSION_MANAGER.add_message(message=UserMessage(user_id=USER_ID, content="你好"),
-                                    to_id=AGENT_ID, to_role="agent", session_id=self.session_id)
-        SESSION_MANAGER.add_message(message=AssistantMessage(user_id=AGENT_ID, content="你好呀，我叫Aifori"),
+        SESSION_MANAGER.add_message(message=UserMessage(content="你好"),
+                                    from_id=USER_ID,
+                                    to_id=ASSISTANT_ID, to_role="agent", session_id=self.session_id)
+        SESSION_MANAGER.add_message(message=AssistantMessage(content="你好呀，我叫Aifori"), from_id=ASSISTANT_ID,
                                     to_id=USER_ID, to_role="user", session_id=self.session_id)
-        SESSION_MANAGER.add_message(message=UserMessage(user_id=AGENT_ID, content="1+1=2吗"),
-                                    to_id=USER_ID, to_role="agent", session_id=self.session_id)
-        SESSION_MANAGER.add_message(message=AssistantMessage(user_id=USER_ID, content="是的，1+1=2"),
-                                    to_id=AGENT_ID, to_role="user", session_id=self.session_id)
+        SESSION_MANAGER.add_message(message=UserMessage(content="1+1=2吗"), from_id=USER_ID,
+                                    to_id=ASSISTANT_ID, to_role="agent", session_id=self.session_id)
+        SESSION_MANAGER.add_message(message=AssistantMessage(content="是的，1+1=2"), from_id=ASSISTANT_ID,
+                                    to_id=USER_ID, to_role="user", session_id=self.session_id)
 
-        messages = SESSION_MANAGER.get_history(_from=[USER_ID, AGENT_ID], to=[USER_ID, AGENT_ID], limit=10)
+        messages = SESSION_MANAGER.get_history(_from=[USER_ID, ASSISTANT_ID], to=[USER_ID, ASSISTANT_ID], limit=10)
         logger.info(f"{messages=}")
         self.assertEquals(4, len(messages))
-        messages = SESSION_MANAGER.get_history(_from=AGENT_ID, limit=10)
+        messages = SESSION_MANAGER.get_history(_from=ASSISTANT_ID, limit=10)
         logger.info(f"{messages=}")
         self.assertEquals(2, len(messages))
 
-        messages = SESSION_MANAGER.get_history(_from=AGENT_ID, to=AGENT_ID, operator="or", limit=10)
+        messages = SESSION_MANAGER.get_history(_from=ASSISTANT_ID, to=ASSISTANT_ID, operator="or", limit=10)
         logger.info(f"{messages=}")
         self.assertEquals(4, len(messages))
 
         SESSION_MANAGER.clear_session(self.session_id)
 
-        messages = SESSION_MANAGER.get_history(_from=AGENT_ID, limit=10)
+        messages = SESSION_MANAGER.get_history(_from=ASSISTANT_ID, limit=10)
         logger.info(f"{messages=}")
         self.assertEquals(0, len(messages))

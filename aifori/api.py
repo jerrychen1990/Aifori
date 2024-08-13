@@ -6,6 +6,7 @@
 @Description  :   api层
 @Contact :   jerrychen1990@gmail.com
 '''
+import copy
 import itertools
 from threading import Thread
 from typing import Iterable, List, Tuple
@@ -14,8 +15,10 @@ from typing import Iterable, List, Tuple
 from aifori.agent import AIAgent, Human
 from aifori.buffer import Buffer
 from aifori.config import *
-from aifori.core import AssistantMessage, ChatRequest, ChatSpeakRequest, SpeakRequest, StreamAssistantMessage, UserMessage, Voice
+from aifori.core import AssistantMessage, ChatRequest, ChatSpeakRequest, SpeakRequest, UserMessage
+from aifori.rule import rule_match
 from aifori.session import SESSION_MANAGER
+from liteai.core import Voice
 from liteai.voice import build_voice, dump_voice_stream
 from snippets.utils import add_callback2gen
 
@@ -79,24 +82,58 @@ def delete_user(id: str):
     return Human.delete(id)
 
 
-def chat_assistant(chat_request: ChatRequest, stream=True, **kwargs) -> AssistantMessage | StreamAssistantMessage:
+def do_remember(user_message: UserMessage, user_id: str, assistant_message: AssistantMessage, assistant_id: str, session_id: str):
+    SESSION_MANAGER.add_message(user_message, from_id=user_id, to_id=assistant_id, to_role="assistant", session_id=session_id)
+
+    if assistant_message.is_stream:
+        def _remember_callback(chunks: List[str], **kwargs):
+            message = AssistantMessage(content="".join(chunks))
+            SESSION_MANAGER.add_message(message, from_id=assistant_id, to_id=user_id, to_role="user", session_id=session_id)
+        assistant_message.content = add_callback2gen(assistant_message.content, _remember_callback)
+    else:
+        SESSION_MANAGER.add_message(assistant_message, from_id=assistant_id, to_id=user_id, to_role="user", session_id=session_id)
+
+
+def dispatch(message: UserMessage, **kwargs):
+    kwargs = copy.deepcopy(kwargs)
+    if match_rules:
+        func = match_rules[0]["func"]
+        kwargs.update(match_rules[0]["kwargs"])
+    else:
+        func = "chat"
+
+    if func == "static_response":
+        return AssistantMessage(content=message.content)
+    elif func == "chat":
+        pass
+    else:
+        raise NotImplementedError(f"func {func} not implemented")
+
+
+def static_response(response: str, stream: bool) -> AssistantMessage:
+    if stream:
+        return AssistantMessage(content=(e for e in response))
+    return AssistantMessage(content=response)
+
+
+def chat_assistant(chat_request: ChatRequest, stream=True, **kwargs) -> AssistantMessage:
     assistant = get_assistant(chat_request.assistant_id)
     user = get_user(chat_request.user_id)
-    user_message = UserMessage(content=chat_request.message, user_id=user.id)
+    user_message = UserMessage(content=chat_request.message)
     session_id = chat_request.session_id
-    assistant_message = assistant.chat(
-        message=user_message,  stream=stream, session_id=session_id, recall_memory=chat_request.recall_memory,
-        **chat_request.llm_gen_config.model_dump(), **kwargs)
-    do_remember = chat_request.do_remember
-    if do_remember:
-        SESSION_MANAGER.add_message(user_message, to_id=assistant.id, to_role="agent", session_id=session_id)
-        if stream:
-            def _remember_callback(chunks: List[str], **kwargs):
-                message = AssistantMessage(content="".join(chunks), user_id=assistant.id)
-                SESSION_MANAGER.add_message(message, to_id=user.id, to_role="user", session_id=session_id)
-            assistant_message.content = add_callback2gen(assistant_message.content, _remember_callback)
-        else:
-            SESSION_MANAGER.add_message(assistant_message, to_id=user.id, to_role="user", session_id=session_id)
+    # 添加规则
+    match_rules = rule_match(query=user_message.content, match_all=False, regex=True)
+    if match_rules:
+        func = match_rules[0]["func"]
+        if func == "static_response":
+            response = match_rules[0]["kwargs"]["resp"]
+            assistant_message = static_response(response=response, stream=stream)
+    else:
+        assistant_message = assistant.chat(user_id=user.id,
+                                           message=user_message,  stream=stream, session_id=session_id, recall_memory=chat_request.recall_memory,
+                                           **chat_request.llm_gen_config.model_dump(), **kwargs)
+    if chat_request.do_remember:
+        do_remember(user_message, user.id, assistant_message, assistant.id, session_id)
     return assistant_message
 
 
@@ -126,16 +163,9 @@ def chat_speak_assistant(req: ChatSpeakRequest) -> Iterable[dict]:
     buffer = Buffer()
 
     def _chat(buffer: Buffer):
-        agent_message: StreamAssistantMessage = assistant.chat(
-            message=user_message,  stream=True, session_id=session_id, recall_memory=req.recall_memory, **req.llm_gen_config.model_dump())
-        if req.do_remember:
-            SESSION_MANAGER.add_message(user_message, to_id=assistant_id, to_role="agent", session_id=session_id)
+        agent_message = chat_assistant(ChatRequest(**req.model_dump()), stream=True)
         for chunk in agent_message.content:
             buffer.add_text(chunk)
-        message = AssistantMessage(content=buffer.text, user_id=assistant_id)
-        logger.info(f"agent {assistant_id} reply {message} for user message:{user_message}")
-        if req.do_remember:
-            SESSION_MANAGER.add_message(message, to_id=req.user_id, to_role="user", session_id=session_id)
         buffer.text_done = True
 
     def _speak(buffer: Buffer):
@@ -159,10 +189,10 @@ def chat_speak_assistant(req: ChatSpeakRequest) -> Iterable[dict]:
     return buffer.gen(gen_text=req.return_text, text_chunk_size=req.text_chunk_size, gen_voice=req.return_voice, voice_chunk_size=req.voice_chunk_size)
 
 
-def decode_chunks(chunks: Iterable[dict], assistant_id: str, return_voice: bool, local_file_path: str) -> Tuple[StreamAssistantMessage, Voice]:
+def decode_chunks(chunks: Iterable[dict], assistant_id: str, return_voice: bool, local_file_path: str) -> Tuple[AssistantMessage, Voice]:
     s1, s2 = itertools.tee(chunks)
     text_stream = (e["text_chunk"] for e in s1 if "text_chunk" in e)
-    message = StreamAssistantMessage(user_id=assistant_id, content=text_stream)
+    message = AssistantMessage(user_id=assistant_id, content=text_stream)
     if return_voice:
         voice_stream = (e["voice_chunk"] for e in s2 if e.get("voice_chunk"))
         voice_stream = (eval(e) if isinstance(e, str) else e for e in voice_stream)

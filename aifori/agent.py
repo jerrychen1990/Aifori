@@ -14,9 +14,9 @@ from aifori.config import *
 from aifori.core import *
 from aifori.memory import MEM, DBMemory
 from liteai import api as liteai_api
-from aifori.rule import rule_match
 from aifori.session import SESSION_MANAGER
 from liteai.api import tts
+from liteai.core import Voice
 
 
 class AIAgent(BaseUser):
@@ -38,27 +38,24 @@ class AIAgent(BaseUser):
 
     def _static_response(self, resp: str, stream: bool, **kwargs) -> Message:
         if stream:
-            return StreamAssistantMessage(content=(e for e in resp), user_id=self.id)
+            return AssistantMessage(content=(e for e in resp), user_id=self.id)
         return AssistantMessage(content=resp, user_id=self.id)
 
-    def _dispatch(self, message: UserMessage, **kwargs):
-        match_rules = rule_match(query=message.content, match_all=False, regex=True)
-        kwargs = copy.deepcopy(kwargs)
-        if match_rules:
-            func = match_rules[0]["func"]
-            kwargs.update(match_rules[0]["kwargs"])
-        else:
-            func = "chat"
+    # def _dispatch(self, message: UserMessage, **kwargs):
+    #     match_rules = rule_match(query=message.content, match_all=False, regex=True)
+    #     kwargs = copy.deepcopy(kwargs)
+    #     if match_rules:
+    #         func = match_rules[0]["func"]
+    #         kwargs.update(match_rules[0]["kwargs"])
+    #     else:
+    #         func = "chat"
 
-        if func == "static_response":
-            return self._static_response(**kwargs)
-        elif func == "chat":
-            return self._chat(message=message, **kwargs)
-        else:
-            raise NotImplementedError(f"func {func} not implemented")
-
-    def chat(self, message: UserMessage, stream=False, session_id=None, **kwargs) -> Message | StreamMessage:
-        return self._dispatch(message=message, stream=stream, session_id=session_id, **kwargs)
+    #     if func == "static_response":
+    #         return self._static_response(**kwargs)
+    #     elif func == "chat":
+    #         return self._chat(message=message, **kwargs)
+    #     else:
+    #         raise NotImplementedError(f"func {func} not implemented")
 
     def _get_memory(self, message: UserMessage) -> str:
         mems = MEM.search(query=message.content, user_id=message.user_id)
@@ -67,12 +64,12 @@ class AIAgent(BaseUser):
         mems = "可供参考的历史记忆:\n" + "\n".join(mems)
         return mems
 
-    def _chat(self, message: UserMessage, stream=False, session_id=None, recall_memory=False, **kwargs) -> Message | StreamMessage:
-        user = Human.from_config(id=message.user_id)
-        history = SESSION_MANAGER.get_history(_from=[self.id, message.user_id], to=[self.id, message.user_id], session_id=session_id)
+    def chat(self, user_id: str, message: UserMessage,  session_id=None, recall_memory=False, stream=False,  ** kwargs) -> AssistantMessage:
+        user = Human.from_config(id=user_id)
+        history = SESSION_MANAGER.get_history(_from=[self.id, user_id], to=[self.id, user_id], session_id=session_id)
         meta = dict(user_info=user.desc, user_name=user.name, bot_info=self.desc, bot_name=self.name)
 
-        system = self._build_system(user_id=message.user_id)
+        system = self._build_system(user_id=user_id)
 
         user_content = message.content
         if recall_memory:
@@ -85,10 +82,7 @@ class AIAgent(BaseUser):
 
         llm_resp = liteai_api.chat(model=self.model, messages=messages, stream=stream, meta=meta, **kwargs, log_level=LITE_AI_LOG_LEVEL)
 
-        if stream:
-            return StreamAssistantMessage(content=llm_resp.content, user_id=self.id)
-        else:
-            return AssistantMessage(content=llm_resp.content, user_id=self.id)
+        return AssistantMessage(content=llm_resp.content, tool_calls=llm_resp.tool_calls)
 
     def speak(self, message: Message | str, stream=True, voice_path: str = None, **kwargs) -> Voice:
         speak_config = copy.copy(self.voice_config)
@@ -105,19 +99,6 @@ class AIAgent(BaseUser):
         config = super().get_config()
         config.update(model=self.model)
         return config
-
-    def remember(self, message: Message | StreamMessage):
-        if isinstance(message, StreamMessage):
-            def _gen():
-                acc = ""
-                for chunk in message.content:
-                    yield chunk
-                    acc += chunk
-                self.memory.add_message(AssistantMessage(content=acc, user_id=self.id))
-            return StreamMessage(content=_gen(), user_id=self.id, role=self.role)
-        else:
-            self.memory.add_message(message)
-            return message
 
 
 class Human(BaseUser):

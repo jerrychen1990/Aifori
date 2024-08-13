@@ -26,11 +26,9 @@ def show_stream_content(stream_content, batch_size: int = 10):
 
 
 def show_message(message: Message):
-    logger.info(f"message from {message.role}, {message.user_id}")
+    logger.info(f"message from {message.role}:")
     if isinstance(message.content, str):
-        logger.info(f"{message.content=}")
+        logger.info(message.content)
         return message.content
     else:
         return show_stream_content(message.content)
-        
-    
