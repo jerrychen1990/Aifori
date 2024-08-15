@@ -154,6 +154,12 @@ def test_rule():
     # client.update_rule(rule_path=os.path.join(DATA_DIR, "rule/rule_new.jsonl"))
 
 
+def test_play_music():
+    voice = client.play_music(user_id=USER_ID, music_desc="dnll", max_seconds=5)
+    # logger.info(f"{voice=}")
+    assert voice is not None
+
+
 def test_session():
     messages = client.list_messages(assistant_id=ASSISTANT_ID, session_id=SESSION_ID, limit=20)
     logger.info(f"{messages=}")
@@ -171,6 +177,7 @@ def main(config_path: str):
 
     try:
         set_up()
+        test_play_music()
         test_rule()
         test_assistant()
         test_session()

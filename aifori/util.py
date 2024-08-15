@@ -8,7 +8,9 @@
 '''
 from loguru import logger
 
+from aifori.config import DEFAULT_VOICE_CHUNK_SIZE
 from aifori.core import Message
+from liteai.core import Voice
 
 
 def show_stream_content(stream_content, batch_size: int = 10):
@@ -32,3 +34,14 @@ def show_message(message: Message):
         return message.content
     else:
         return show_stream_content(message.content)
+
+
+def voice2api_stream(voice: Voice, chunk_size=DEFAULT_VOICE_CHUNK_SIZE):
+    acc = b""
+    for chunk in voice.byte_stream:
+        acc += chunk
+        while len(acc) > chunk_size:
+            yield dict(voice_chunk=acc[:chunk_size])
+            acc = acc[chunk_size:]
+    if len(acc) > 0:
+        yield dict(voice_chunk=acc)

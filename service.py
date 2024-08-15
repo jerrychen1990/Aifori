@@ -11,6 +11,7 @@ from typing import Any, List
 
 import aifori.api as api
 from loguru import logger
+from aifori.util import voice2api_stream
 from liteai.core import Voice
 from snippets import load, set_logger
 from snippets.utils import jdumps
@@ -210,3 +211,29 @@ async def get():
     with open("assets/test_speak.html", "r", encoding="utf-8") as f:
         html = f.read()
     return HTMLResponse(html)
+
+
+@app.post("/assistant/play_music_stream", tags=["music"], description="播放音乐")
+async def play_music_stream(user_id: str = Body(description="user_id", examples=["test_user"], embed=True),
+                            music_desc: str = Body(description="音乐描述", examples=["dnll"], embed=True)) -> StreamingResponse:
+    voice = api.play_music(user_id=user_id, music_desc=music_desc)
+    chunk_stream = voice2api_stream(voice)
+    chunk_stream = (jdumps(chunk, indent=None) + "\n" for chunk in chunk_stream)
+    return StreamingResponse(chunk_stream, media_type="application/x-ndjson")
+
+
+@app.websocket("/assistant/play_music_stream")
+async def ws_play_music_stream(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        req = await websocket.receive_text()
+        logger.debug(f"websocket {req=}")
+        voice = api.play_music(**req)
+        chunk_stream = voice2api_stream(voice)
+        for chunk in chunk_stream:
+            b_chunk = jdumps(chunk, indent=None).encode("utf-8")
+            await websocket.send_bytes(b_chunk)
+    except Exception as e:
+        logger.info(f"Connection closed: {e}")
+    finally:
+        await websocket.close()

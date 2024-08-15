@@ -6,20 +6,19 @@
 @Description  :   api层
 @Contact :   jerrychen1990@gmail.com
 '''
-import copy
-import itertools
 from threading import Thread
-from typing import Iterable, List, Tuple
+from typing import Iterable, List
 
 
 from aifori.agent import AIAgent, Human
 from aifori.buffer import Buffer
 from aifori.config import *
 from aifori.core import AssistantMessage, ChatRequest, ChatSpeakRequest, SpeakRequest, UserMessage
+from aifori.music import get_music_voice
 from aifori.rule import rule_match
 from aifori.session import SESSION_MANAGER
 from liteai.core import Voice
-from liteai.voice import build_voice, dump_voice_stream
+from liteai.voice import dump_voice_stream
 from snippets.utils import add_callback2gen
 
 
@@ -94,22 +93,6 @@ def do_remember(user_message: UserMessage, user_id: str, assistant_message: Assi
         SESSION_MANAGER.add_message(assistant_message, from_id=assistant_id, to_id=user_id, to_role="user", session_id=session_id)
 
 
-def dispatch(message: UserMessage, **kwargs):
-    kwargs = copy.deepcopy(kwargs)
-    if match_rules:
-        func = match_rules[0]["func"]
-        kwargs.update(match_rules[0]["kwargs"])
-    else:
-        func = "chat"
-
-    if func == "static_response":
-        return AssistantMessage(content=message.content)
-    elif func == "chat":
-        pass
-    else:
-        raise NotImplementedError(f"func {func} not implemented")
-
-
 def static_response(response: str, stream: bool) -> AssistantMessage:
     if stream:
         return AssistantMessage(content=(e for e in response))
@@ -157,9 +140,6 @@ def speak_assistant(speak_request: SpeakRequest, stream=True) -> Voice:
 
 def chat_speak_assistant(req: ChatSpeakRequest) -> Iterable[dict]:
     assistant = get_assistant(req.assistant_id)
-    assistant_id = assistant.id
-    user_message = UserMessage(content=req.message, user_id=req.user_id)
-    session_id = req.session_id
     buffer = Buffer()
 
     def _chat(buffer: Buffer):
@@ -189,15 +169,8 @@ def chat_speak_assistant(req: ChatSpeakRequest) -> Iterable[dict]:
     return buffer.gen(gen_text=req.return_text, text_chunk_size=req.text_chunk_size, gen_voice=req.return_voice, voice_chunk_size=req.voice_chunk_size)
 
 
-def decode_chunks(chunks: Iterable[dict], assistant_id: str, return_voice: bool, local_file_path: str) -> Tuple[AssistantMessage, Voice]:
-    s1, s2 = itertools.tee(chunks)
-    text_stream = (e["text_chunk"] for e in s1 if "text_chunk" in e)
-    message = AssistantMessage(user_id=assistant_id, content=text_stream)
-    if return_voice:
-        voice_stream = (e["voice_chunk"] for e in s2 if e.get("voice_chunk"))
-        voice_stream = (eval(e) if isinstance(e, str) else e for e in voice_stream)
-
-        voice = build_voice(byte_stream=voice_stream, file_path=local_file_path)
-    else:
-        voice = None
-    return message, voice
+def play_music(user_id: str, music_desc: str):
+    user = get_user(user_id)
+    logger.info("play music")
+    voice: Voice = get_music_voice(music_desc)
+    return voice

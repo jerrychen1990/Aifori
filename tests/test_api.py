@@ -11,6 +11,7 @@
 import unittest
 
 from aifori.api import *
+from aifori.client import decode_chunks
 from aifori.core import ChatRequest
 # from aifori.client import handle_chat_stream
 from aifori.util import show_message

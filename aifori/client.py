@@ -8,11 +8,11 @@
 '''
 
 
+import itertools
 import json
 import os
 from typing import Iterable, List, Tuple
 import requests
-from aifori.api import decode_chunks
 from aifori.core import AssistantMessage, ChatRequest, ChatSpeakRequest, Message, SpeakRequest
 from loguru import logger
 
@@ -20,6 +20,36 @@ from liteai.core import Voice
 from liteai.voice import build_voice, play_voice
 
 # urllib3.disable_warnings()
+
+
+def handle_chat_stream(stream: Iterable[dict]):
+    for chunk in stream:
+        k, v = list(chunk.items())[0]
+        logger.debug(f"receive chunk with type:{k}, size:{len(v)}, {v[:10]}")
+
+
+def decode_texts(text_stream: Iterable[dict | bytes], assistant_id: str) -> AssistantMessage:
+    text_stream = (e if isinstance(e, dict) else eval(e.decode("utf8")) for e in text_stream)
+    text_stream = (e["text_chunk"] for e in text_stream if "text_chunk" in e)
+    return AssistantMessage(user_id=assistant_id, content=text_stream)
+
+
+def decode_voice(byte_stream: Iterable[dict | bytes], local_file_path: str) -> Voice:
+    byte_stream = (e if isinstance(e, dict) else eval(e.decode("utf8")) for e in byte_stream)
+    voice_stream = (e["voice_chunk"] for e in byte_stream if e.get("voice_chunk"))
+    voice_stream = (eval(e) if isinstance(e, str) else e for e in voice_stream)
+    voice = build_voice(byte_stream=voice_stream, file_path=local_file_path)
+    return voice
+
+
+def decode_chunks(chunks: Iterable[dict], assistant_id: str, return_voice: bool, local_file_path: str) -> Tuple[AssistantMessage, Voice]:
+    s1, s2 = itertools.tee(chunks)
+    message = decode_texts(s1, assistant_id)
+    if return_voice:
+        voice = decode_voice(s2, local_file_path)
+    else:
+        voice = None
+    return message, voice
 
 
 class AiForiClient(object):
@@ -93,25 +123,15 @@ class AiForiClient(object):
         if stream:
             resp = self._do_request('/assistant/chat_stream', json=data, stream=True).iter_lines()
             assistant_id = data["assistant_id"]
-
-            def gen():
-                for chunk in resp:
-                    if chunk:
-                        chunk = json.loads(chunk.decode('utf-8'))["text_chunk"]
-                        yield chunk
-
-            return AssistantMessage(user_id=assistant_id, content=gen())
+            return decode_texts(resp, assistant_id)
         else:
             resp = self._do_request('/assistant/chat', json=data)
             return AssistantMessage.model_validate(resp)
 
     def speak(self, speak_req: SpeakRequest, play=False, local_voice_path: str = None):
         resp = self._do_request('/assistant/speak_stream',
-                                json=speak_req.model_dump(), stream=True)
-        byte_stream = (json.loads(item.decode("utf-8")) for item in resp.iter_lines())
-        byte_stream = (e["voice_chunk"] for e in byte_stream if e.get("voice_chunk"))
-        byte_stream = (eval(e) if isinstance(e, str) else e for e in byte_stream)
-        voice = build_voice(byte_stream=byte_stream, file_path=local_voice_path)
+                                json=speak_req.model_dump(), stream=True).iter_lines()
+        voice = decode_voice(resp, local_voice_path)
         if play:
             voice = play_voice(voice)
         return voice
@@ -119,13 +139,18 @@ class AiForiClient(object):
     def chat_speak_stream(self, chat_speak_request: ChatSpeakRequest, local_voice_path: str = None, play: bool = False) -> Tuple[AssistantMessage, Voice]:
         resp = self._do_request('/assistant/chat_speak_stream', json=chat_speak_request.model_dump(), stream=True).iter_lines()
         resp = (json.loads(item.decode("utf-8")) for item in resp)
-        # resp = map(lambda e: logger.info(e), resp)
-
         message, voice = decode_chunks(resp, assistant_id=chat_speak_request.assistant_id,
                                        return_voice=chat_speak_request.return_voice, local_file_path=local_voice_path)
         if play:
             play_voice(voice)
         return message, voice
+
+    def play_music(self, user_id: str, music_desc: str, local_voice_path: str = None, play: bool = True, max_seconds=None) -> Voice:
+        resp = self._do_request('/assistant/play_music_stream', json=dict(user_id=user_id, music_desc=music_desc), stream=True).iter_lines()
+        voice = decode_voice(resp, local_voice_path)
+        if play:
+            play_voice(voice, max_seconds=max_seconds)
+        return voice
 
     def clear_session(self, session_id: str) -> dict:
         resp = self._do_request('/session/clear', json={'session_id': session_id})
@@ -145,9 +170,3 @@ class AiForiClient(object):
             files = {'upload_file': (os.path.basename(rule_path), f)}
             resp = self._do_request('/rule/update', files=files)
             return resp
-
-
-def handle_chat_stream(stream: Iterable[dict]):
-    for chunk in stream:
-        k, v = list(chunk.items())[0]
-        logger.debug(f"receive chunk with type:{k}, size:{len(v)}, {v[:10]}")

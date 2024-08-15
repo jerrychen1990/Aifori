@@ -28,6 +28,9 @@ DEFAULT_RULE_PATH = os.path.join(RULE_DIR, DEFAULT_RULE_NAME)
 DB_DIR = os.path.join(AIFORI_HOME, "db")
 os.makedirs(DATA_DIR, exist_ok=True)
 
+MUSIC_DIR = os.path.join(AIFORI_HOME, "music")
+os.makedirs(MUSIC_DIR, exist_ok=True)
+
 
 # mem0配置
 MEM_CONFIG = {
