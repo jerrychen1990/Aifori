@@ -183,3 +183,4 @@ cert.pem
 key.pem
 dump.rdb
 app/profile.json
+app/ws.py

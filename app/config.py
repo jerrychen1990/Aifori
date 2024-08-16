@@ -12,7 +12,7 @@ import os
 
 
 LLM_MODELS = ["glm-4-airx",  "glm-4-0520", "glm-4-flash", "emohaa"]
-HOST = "http://127.0.0.1:9001"
+HOST = "http://127.0.0.1:9100"
 
 
 CHARACTER_MAP = {
@@ -48,3 +48,5 @@ USER_AGENTS = {
     }
 
 }
+
+VOICE_CHUNK_SIZE = 8192*10

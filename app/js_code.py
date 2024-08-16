@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+html_code = """<!DOCTYPE html>
 <html>
 
 
@@ -79,7 +79,7 @@
         source.buffer = buffer; // 告诉该源播放何物
         source.connect(context.destination); //将该源与硬件相连
         source.start(0); // 开始播放
-    }
+    };
 
 
     function onSendMessage() {
@@ -90,7 +90,7 @@
         objSocket.send(JSON.stringify(message));
         console.log('Sent message to server: ' + JSON.stringify(message));	//发送消息
 
-    }
+    };
 
     // navigator.mediaDevices.getUserMedia({ audio: true });
 
@@ -128,3 +128,4 @@
 </script>
 
 </html>
+"""

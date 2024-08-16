@@ -16,18 +16,19 @@ from aifori.memory import MEM, DBMemory
 from liteai import api as liteai_api
 from aifori.session import SESSION_MANAGER
 from liteai.api import tts
-from liteai.core import Voice
+from liteai.core import ToolDesc, Voice
 
 
 class AIAgent(BaseUser):
     role = "assistant"
 
-    def __init__(self, model: str, voice_config: dict = {}, **kwargs):
+    def __init__(self, model: str, voice_config: dict = {}, tools: List[ToolDesc] = [], **kwargs):
         super().__init__(**kwargs)
         self.memory = DBMemory(agent_id=self.id)
         self.model = model
         self.voice_config = voice_config
         self.system_template = DEFAULT_SYSTEM_TEMPLATE
+        self.tools = tools
 
     def _build_system(self, user_id: str) -> str:
         user = Human.from_config(id=user_id)
@@ -40,22 +41,6 @@ class AIAgent(BaseUser):
         if stream:
             return AssistantMessage(content=(e for e in resp), user_id=self.id)
         return AssistantMessage(content=resp, user_id=self.id)
-
-    # def _dispatch(self, message: UserMessage, **kwargs):
-    #     match_rules = rule_match(query=message.content, match_all=False, regex=True)
-    #     kwargs = copy.deepcopy(kwargs)
-    #     if match_rules:
-    #         func = match_rules[0]["func"]
-    #         kwargs.update(match_rules[0]["kwargs"])
-    #     else:
-    #         func = "chat"
-
-    #     if func == "static_response":
-    #         return self._static_response(**kwargs)
-    #     elif func == "chat":
-    #         return self._chat(message=message, **kwargs)
-    #     else:
-    #         raise NotImplementedError(f"func {func} not implemented")
 
     def _get_memory(self, message: UserMessage) -> str:
         mems = MEM.search(query=message.content, user_id=message.user_id)
@@ -80,7 +65,8 @@ class AIAgent(BaseUser):
 
         kwargs["handle_system"] = False
 
-        llm_resp = liteai_api.chat(model=self.model, messages=messages, stream=stream, meta=meta, **kwargs, log_level=LITE_AI_LOG_LEVEL)
+        llm_resp = liteai_api.chat(model=self.model, messages=messages, stream=stream, meta=meta,
+                                   tools=self.tools, **kwargs, log_level=LITE_AI_LOG_LEVEL)
 
         return AssistantMessage(content=llm_resp.content, tool_calls=llm_resp.tool_calls)
 
@@ -97,7 +83,7 @@ class AIAgent(BaseUser):
 
     def get_config(self):
         config = super().get_config()
-        config.update(model=self.model)
+        config.update(model=self.model, tools=self.tools)
         return config
 
 

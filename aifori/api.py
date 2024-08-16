@@ -17,7 +17,7 @@ from aifori.core import AssistantMessage, ChatRequest, ChatSpeakRequest, SpeakRe
 from aifori.music import get_music_voice
 from aifori.rule import rule_match
 from aifori.session import SESSION_MANAGER
-from liteai.core import Voice
+from liteai.core import ToolDesc, Voice
 from liteai.voice import dump_voice_stream
 from snippets.utils import add_callback2gen
 
@@ -37,7 +37,9 @@ def get_user(id: str) -> Human:
     return user
 
 
-def create_assistant(name: str, desc: str, id: str, model: str, voice_config: dict = DEFAULT_VOICE_CONFIG, exists_ok=True, do_save=True) -> AIAgent:
+def create_assistant(name: str, desc: str, id: str, model: str,
+                     tools: List[ToolDesc] = [],
+                     voice_config: dict = DEFAULT_VOICE_CONFIG, exists_ok=True, do_save=True) -> AIAgent:
     try:
         agent = get_assistant(id)
         msg = f"assistant:{id} already exists, will not create new one"
@@ -49,7 +51,7 @@ def create_assistant(name: str, desc: str, id: str, model: str, voice_config: di
     except Exception as e:
         pass
 
-    agent = AIAgent(name=name, desc=desc, model=model, id=id, voice_config=voice_config)
+    agent = AIAgent(name=name, desc=desc, model=model, id=id, tools=tools, voice_config=voice_config)
     if do_save:
         agent.save()
     return agent

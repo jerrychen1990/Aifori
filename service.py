@@ -227,13 +227,17 @@ async def ws_play_music_stream(websocket: WebSocket):
     await websocket.accept()
     try:
         req = await websocket.receive_text()
+        req = json.loads(req)
         logger.debug(f"websocket {req=}")
         voice = api.play_music(**req)
-        chunk_stream = voice2api_stream(voice)
-        for chunk in chunk_stream:
-            b_chunk = jdumps(chunk, indent=None).encode("utf-8")
+        # chunk_stream = voice2api_stream(voice)
+        for chunk in voice.byte_stream:
+            logger.debug(f"send chunk, with size {len(chunk)}, {type(chunk)=}, {chunk[:10]=}")
+            b_chunk = chunk
+            # b_chunk = jdumps(chunk, indent=None).encode("utf-8")
             await websocket.send_bytes(b_chunk)
     except Exception as e:
-        logger.info(f"Connection closed: {e}")
+        logger.exception(e)
+        # logger.info(f"Connection closed: {e}")
     finally:
         await websocket.close()

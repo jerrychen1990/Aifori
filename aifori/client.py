@@ -16,7 +16,7 @@ import requests
 from aifori.core import AssistantMessage, ChatRequest, ChatSpeakRequest, Message, SpeakRequest
 from loguru import logger
 
-from liteai.core import Voice
+from liteai.core import ToolCall, Voice
 from liteai.voice import build_voice, play_voice
 
 # urllib3.disable_warnings()
@@ -38,6 +38,7 @@ def decode_voice(byte_stream: Iterable[dict | bytes], local_file_path: str) -> V
     byte_stream = (e if isinstance(e, dict) else eval(e.decode("utf8")) for e in byte_stream)
     voice_stream = (e["voice_chunk"] for e in byte_stream if e.get("voice_chunk"))
     voice_stream = (eval(e) if isinstance(e, str) else e for e in voice_stream)
+    logger.debug(f"decode voice with {local_file_path=}")
     voice = build_voice(byte_stream=voice_stream, file_path=local_file_path)
     return voice
 

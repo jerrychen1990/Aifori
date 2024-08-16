@@ -9,7 +9,7 @@
 import os
 from loguru import logger
 from aifori.config import DEFAULT_VOICE_CHUNK_SIZE, MUSIC_DIR
-from liteai.core import Voice
+from liteai.core import Parameter, ToolDesc, Voice
 from liteai.voice import file2voice, play_voice
 
 
@@ -19,6 +19,10 @@ def get_music_voice(desc: str) -> Voice:
     logger.debug(f"play music : {music_path}")
     voice = file2voice(music_path)
     return voice
+
+
+MusicToolDesc = ToolDesc(name="play_music", description="根据描述播放音乐",
+                         parameters=[Parameter(name="desc", description="音乐描述", type="string", required=True)])
 
 
 if __name__ == "__main__":

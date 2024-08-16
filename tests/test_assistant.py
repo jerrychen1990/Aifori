@@ -13,6 +13,7 @@ from aifori.agent import *
 from aifori.api import create_assistant, create_user, get_assistant, clear_session
 from loguru import logger
 from aifori.config import *
+from aifori.music import MusicToolDesc
 from aifori.util import show_message
 from snippets import set_logger
 from liteai.core import Voice
@@ -54,3 +55,12 @@ class TestAssistant(unittest.TestCase):
         message = AssistantMessage(content="你好，我叫Aifori, 有什么能帮到你的么？", user_id=self.assistant_id)
         voice: Voice = assistant.speak(message)
         play_voice(voice=voice)
+
+    def test_recommend_music(self):
+        tools = [MusicToolDesc]
+        assistant = create_assistant(id="ut_tool_assistant", name="ut_tool_assistant",
+                                     desc="ut_tool_assistant", model=DEFAULT_MODEL, exists_ok=True, tools=tools)
+
+        resp = assistant.chat(self.user_id, UserMessage(content="推荐一首欢快的歌曲", user_id=self.user_id))
+        logger.info(resp)
+        show_message(resp)

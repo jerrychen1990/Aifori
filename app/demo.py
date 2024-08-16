@@ -7,6 +7,8 @@
 @Contact :   jerrychen1990@gmail.com
 '''
 
+import base64
+import io
 import os
 import time
 import uuid
@@ -14,6 +16,8 @@ import streamlit as st
 
 from aifori.client import AiForiClient
 from aifori.config import *
+from aifori.core import ChatRequest, SpeakRequest
+from liteai.core import Voice
 from liteai.voice import get_duration
 from snippets import set_logger, load, dump
 from app.config import *
@@ -34,11 +38,11 @@ class SessionManager:
         self.client = AiForiClient(host=HOST)
         self.new_session()
 
-    def update_profile(self, agent_id, agent_name, agent_desc, user_id, user_name, user_desc, model, voice_config):
+    def update_profile(self, assistant_id, assistant_name, assistant_desc, user_id, user_name, user_desc, model, voice_config):
         logger.debug("updating profile")
-        self.agent_info = self.client.get_or_create_agent(agent_id=agent_id, name=agent_name, desc=agent_desc,
-                                                          model=model, voice_config=voice_config)
-        self.agent_id = agent_id
+        self.assistant_info = self.client.get_or_create_assistant(assistant_id=assistant_id, name=assistant_name, desc=assistant_desc,
+                                                                  model=model, voice_config=voice_config)
+        self.assistant_id = assistant_id
 
         self.user_info = self.client.get_or_create_user(user_id=user_id, name=user_name, desc=user_desc)
         self.user_id = user_id
@@ -49,13 +53,16 @@ class SessionManager:
         self.round = 0
 
     def get_resp(self, prompt):
-        resp = self.client.chat(message=prompt, user_id=self.user_id, agent_id=self.agent_id, session_id=self.session_id, stream=True)
+        req = ChatRequest(message=prompt, user_id=self.user_id, assistant_id=self.assistant_id, session_id=self.session_id)
+        resp = self.client.chat(req, stream=True)
         return resp.content
 
-    def play_message(self, message: str, voice_config):
-        voice_path = os.path.join(VOICE_DIR, self.session_id, f"{self.round}.mp3")
-        self.client.speak(message=message, agent_id=self.agent_id, dump_path=voice_path, play_local=False, voice_config=voice_config)
-        return voice_path
+    def message2voice(self, message: str, voice_config):
+        local_voice_path = os.path.join(VOICE_DIR, self.session_id, f"{self.round}.mp3")
+        speak_req = SpeakRequest(message=message, assistant_id=self.assistant_id, session_id=self.session_id,
+                                 voice_config=voice_config, voice_chunk_size=VOICE_CHUNK_SIZE)
+        voice = self.client.speak(speak_req, local_voice_path=local_voice_path)
+        return voice
 
     def add_message(self, message):
         self.logger.info(f"add message: {message}")
@@ -80,20 +87,20 @@ if not profile:
         user_name = st.text_input("用户名", DEFAULT_USER_NAME)
         user_desc = st.text_area("用户描述", DEFAULT_USER_DESC, height=100)
 
-        agent_name = st.text_input("AI名称", DEFAULT_AI_NAME)
-        agent_desc = st.text_area("用户描述", DEFAULT_AI_DESC, height=100)
+        assistant_name = st.text_input("AI名称", DEFAULT_AI_NAME)
+        assistant_desc = st.text_area("用户描述", DEFAULT_AI_DESC, height=100)
         profile = dict(user_name=user_name,  user_desc=user_desc,
-                       agent_desc=agent_desc, agent_name=agent_name)
+                       assistant_desc=assistant_desc, assistant_name=assistant_name)
 
         if p_name == "新建Agent":
-            profile.update(user_id=user_name, agent_id=agent_name)
+            profile.update(user_id=user_name, assistant_id=assistant_name)
         else:
-            profile.update(user_id=str(uuid.uuid4()), agent_id=str(uuid.uuid4()))
+            profile.update(user_id=str(uuid.uuid4()), assistant_id=str(uuid.uuid4()))
 
         if p_name == "新建Agent":
             save = st.button("保存")
             if save:
-                p_key = f"{agent_name}_{user_name}"
+                p_key = f"{assistant_name}_{user_name}"
                 if p_key in profiles:
                     st.warning("无法更新Agent配置，已有重复的Agent+User组合!")
                 else:
@@ -115,8 +122,8 @@ session_manager.update_profile(**profile, model=model, voice_config=voice_config
 
 clear = st.sidebar.button("新一轮对话")
 speak = st.sidebar.checkbox("播放音频", value=False)
-if speak:
-    autoplay = st.sidebar.checkbox("自动播放", value=False)
+# if speak:
+#     autoplay = st.sidebar.checkbox("自动播放", value=False)
 
 
 if clear:
@@ -131,16 +138,46 @@ for message in session_manager.messages:
         st.markdown(message["content"])
 
 
+def play_voice(voice: Voice):
+    from pydub import AudioSegment
+    first_voice_latency = time.time() - stt
+    for idx, chunk in enumerate(voice.byte_stream):
+        encoded_audio = base64.b64encode(chunk).decode()
+
+        # HTML + JavaScript 控制音频播放且隐藏控件
+        audio_html = f"""
+        <audio id="hidden_audio_{idx}" controls style="display:none;">
+            <source src="data:audio/mp3;base64,{encoded_audio}" type="audio/mp3">
+        </audio>
+        <script>
+        var audio = document.getElementById('hidden_audio_{idx}');
+        audio.play();
+        </script>
+        """
+        st.components.v1.html(audio_html, height=0)
+        duration = len(AudioSegment.from_file(io.BytesIO(chunk), format="mp3"))/1000
+        # duration = 1
+        logger.debug(f"play audio chunk with size:{len(chunk)}, duration:{duration}")
+        time.sleep(duration-0.2)
+
+    video_duration = get_duration(voice.file_path)
+
+    st.audio(voice.file_path, format='audio/mp3', autoplay=False)
+    msg = f"返回音频延时[{first_voice_latency:2.3f}]s, 音频时长[{video_duration:2.1f}]s"
+    st.info(msg)
+
+
 if prompt := st.chat_input("你好，你是谁？"):
     with st.chat_message("user"):
         st.markdown(prompt)
-    # Display agent response in chat message container
-    with st.chat_message("agent"):
+    # Display assistant response in chat message container
+    with st.chat_message("assistant"):
         message_placeholder = st.empty()
         full_response = ""
 
     stt = time.time()
     resp = session_manager.get_resp(prompt)
+
     for token in resp:
         fist_token_latency = time.time() - stt
         full_response += token
@@ -149,22 +186,17 @@ if prompt := st.chat_input("你好，你是谁？"):
     message_placeholder.markdown(full_response)
     full_token_latency = time.time() - stt
     msg = f"返回[{len(full_response)}]字, 首字延时[{fist_token_latency: 2.3f}]s, 回复完成延时[{full_token_latency:2.3f}]s"
-    voice_path = None
+    st.info(msg)
 
     if speak:
         voice_config = dict(voice_id=voice_id, speed=speed, pitch=pitch)
-        voice_path = session_manager.play_message(full_response, voice_config=voice_config)
-        first_voice_latency = time.time() - stt
-        video_duration = get_duration(voice_path)
-        st.audio(voice_path, format='audio/mp3', autoplay=autoplay)
-        msg += f", 音频延时[{first_voice_latency:2.3f}]s, 音频时长[{video_duration:2.1f}]s"
-
-    st.info(msg)
+        voice = session_manager.message2voice(full_response, voice_config=voice_config)
+        play_voice(voice)
 
     user_message = {"role": "user", "content": prompt, "session_id": session_manager.session_id}
-    agent_message = {"role": "agent", "content": full_response, "session_id": session_manager.session_id, "voice_path": voice_path}
+    assistant_message = {"role": "assistant", "content": full_response, "session_id": session_manager.session_id, "voice_path": voice.file_path}
 
     session_manager.add_message(user_message)
-    session_manager.add_message(agent_message)
+    session_manager.add_message(assistant_message)
 
     session_manager.round += 1
