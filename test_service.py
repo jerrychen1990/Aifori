@@ -11,8 +11,10 @@ import glob
 import os
 import click
 from loguru import logger
+from aifori.api import create_assistant
 from aifori.config import DATA_DIR, DEFAULT_AI_DESC, DEFAULT_AI_NAME, DEFAULT_MODEL, DEFAULT_USER_DESC, DEFAULT_USER_NAME
 from aifori.core import ChatRequest, ChatSpeakRequest, LLMGenConfig, SpeakRequest
+from aifori.music import MusicToolDesc
 from aifori.util import show_message
 from snippets import set_logger
 from aifori.client import AiForiClient
@@ -155,9 +157,17 @@ def test_rule():
 
 
 def test_play_music():
-    voice = client.play_music(user_id=USER_ID, music_desc="dnll", max_seconds=5)
-    # logger.info(f"{voice=}")
-    assert voice is not None
+    tools = [MusicToolDesc]
+
+    assistant = create_assistant(id="test_tool_assistant", name="test_tool_assistant",
+                                 desc="test_tool_assistant", model=DEFAULT_MODEL, exists_ok=True, tools=tools)
+
+    req = ChatRequest(assistant_id=assistant.id, user_id=USER_ID, session_id=SESSION_ID,
+                      message="推荐一首欢快的歌曲", do_remember=True)
+    message = client.chat(req, stream=True)
+    assert len(message.tool_calls) == 1
+    client.on_tool(message, callbacks=dict(play_music=client.on_play_music), user_id=USER_ID)
+    show_message(message)
 
 
 def test_session():

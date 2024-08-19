@@ -7,7 +7,7 @@ from aifori.session import SESSION_MANAGER
 from aifori.config import *
 from aifori.core import AssistantMessage, ChatSpeakRequest, Message, ChatRequest, SpeakRequest
 from pydantic import BaseModel, Field
-from typing import Any, List
+from typing import Any, Iterable, List
 
 import aifori.api as api
 from loguru import logger
@@ -113,11 +113,19 @@ async def chat_assistant(req: ChatRequest = Body(description="请求体")) -> Re
     return Response(data=message)
 
 
+def message2stream(message: AssistantMessage) -> Iterable[dict]:
+    if tool_calls := message.tool_calls:
+        for tool_call in tool_calls:
+            yield dict(tool_call=jdumps(tool_call.model_dump(exclude_none=True), indent=None))
+    for chunk in message.content:
+        yield dict(text_chunk=chunk)
+
+
 @app.post("/assistant/chat_stream", tags=["assistant"], description="和Assistant进行对话,可以返回语音,sse流式")
 @try_wrapper
 async def chat_assistant_stream(req: ChatRequest = Body(description="请求体")) -> StreamingResponse:
     message: AssistantMessage = api.chat_assistant(req, stream=True)
-    content_stream = (jdumps(dict(text_chunk=chunk), indent=None) + "\n" for chunk in message.content)
+    content_stream = (jdumps(ele, indent=None) + "\n" for ele in message2stream(message))
     return StreamingResponse(content_stream, media_type="application/x-ndjson")
 
 

@@ -24,7 +24,7 @@ class UserMessage(Message):
 
 class AssistantMessage(Message):
     role: str = "assistant"
-    tool_calls: Optional[List[ToolCall]] = Field(default=None, description="tool calls")
+    tool_calls: Optional[List[ToolCall]] = Field(default=[], description="tool calls")
 
     @property
     def is_stream(self):

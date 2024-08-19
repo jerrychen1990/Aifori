@@ -14,6 +14,7 @@ from aifori.api import *
 from aifori.client import decode_chunks
 from aifori.core import ChatRequest
 # from aifori.client import handle_chat_stream
+from aifori.music import MusicToolDesc
 from aifori.util import show_message
 from liteai.core import LLMGenConfig
 from liteai.voice import play_file, play_voice
@@ -72,6 +73,21 @@ class APITestCase(unittest.TestCase):
         logger.info(f"{voice.file_path=}")
         assert os.path.exists(voice.file_path)
         play_voice(voice)
+
+    def test_chat_music(self):
+
+        tools = [MusicToolDesc]
+
+        assistant = create_assistant(id="ut_tool_assistant", name="ut_tool_assistant",
+                                     desc="ut_tool_assistant", model=DEFAULT_MODEL, exists_ok=True, tools=tools)
+        create_user(name=self.user_id, desc=self.user_id, id=self.user_id, do_save=True)
+
+        req = ChatRequest(assistant_id=assistant.id, user_id=self.user_id, session_id=self.session_id,
+                          message="推荐一首欢快的歌曲", do_remember=True)
+        message = chat_assistant(req, stream=False)
+        
+
+        show_message(message)
 
     def test_chat_speak_assistant(self):
         create_assistant(name=self.assistant_id, desc=self.assistant_id, id=self.assistant_id, model=DEFAULT_MODEL, do_save=True)

@@ -11,7 +11,7 @@
 import itertools
 import json
 import os
-from typing import Iterable, List, Tuple
+from typing import Callable, Dict, Iterable, List, Tuple
 import requests
 from aifori.core import AssistantMessage, ChatRequest, ChatSpeakRequest, Message, SpeakRequest
 from loguru import logger
@@ -28,10 +28,18 @@ def handle_chat_stream(stream: Iterable[dict]):
         logger.debug(f"receive chunk with type:{k}, size:{len(v)}, {v[:10]}")
 
 
-def decode_texts(text_stream: Iterable[dict | bytes], assistant_id: str) -> AssistantMessage:
-    text_stream = (e if isinstance(e, dict) else eval(e.decode("utf8")) for e in text_stream)
-    text_stream = (e["text_chunk"] for e in text_stream if "text_chunk" in e)
-    return AssistantMessage(user_id=assistant_id, content=text_stream)
+def decode_message(stream: Iterable[dict | bytes], assistant_id: str) -> AssistantMessage:
+    dict_stream = (e if isinstance(e, dict) else eval(e.decode("utf8")) for e in stream)
+    content_stream, tool_stream = itertools.tee(dict_stream)
+    content_stream = (e["text_chunk"] for e in content_stream if "text_chunk" in e)
+    tool_calls = []
+    for tool in tool_stream:
+        if "tool_call" in tool:
+            tool_call = eval(tool["tool_call"])
+            logger.debug(f"decode tool call: {tool_call}")
+            tool_calls.append(ToolCall.model_validate(tool_call))
+
+    return AssistantMessage(user_id=assistant_id, content=content_stream, tool_calls=tool_calls)
 
 
 def decode_voice(byte_stream: Iterable[dict | bytes], local_file_path: str) -> Voice:
@@ -45,7 +53,7 @@ def decode_voice(byte_stream: Iterable[dict | bytes], local_file_path: str) -> V
 
 def decode_chunks(chunks: Iterable[dict], assistant_id: str, return_voice: bool, local_file_path: str) -> Tuple[AssistantMessage, Voice]:
     s1, s2 = itertools.tee(chunks)
-    message = decode_texts(s1, assistant_id)
+    message = decode_message(s1, assistant_id)
     if return_voice:
         voice = decode_voice(s2, local_file_path)
     else:
@@ -124,7 +132,7 @@ class AiForiClient(object):
         if stream:
             resp = self._do_request('/assistant/chat_stream', json=data, stream=True).iter_lines()
             assistant_id = data["assistant_id"]
-            return decode_texts(resp, assistant_id)
+            return decode_message(resp, assistant_id)
         else:
             resp = self._do_request('/assistant/chat', json=data)
             return AssistantMessage.model_validate(resp)
@@ -152,6 +160,20 @@ class AiForiClient(object):
         if play:
             play_voice(voice, max_seconds=max_seconds)
         return voice
+
+    def on_play_music(self, message, tool_call, **kwargs):
+        logger.debug(f"play music with {tool_call=}, {kwargs=}")
+        new_kwargs = dict(**tool_call.parameters, **kwargs)
+        logger.debug(f"play music with {new_kwargs=}")
+        self.play_music(**new_kwargs)
+        message.content = "好的，这就为您播放音乐"
+
+    def on_tool(self, message: AssistantMessage, callbacks=Dict[str, Callable], **kwargs):
+        if tool_calls := message.tool_calls:
+            for tool_call in tool_calls:
+                if tool_call.name in callbacks:
+                    logger.debug(f"on tool call: {tool_call}")
+                    callbacks[tool_call.name](message=message, tool_call=tool_call, **kwargs)
 
     def clear_session(self, session_id: str) -> dict:
         resp = self._do_request('/session/clear', json={'session_id': session_id})

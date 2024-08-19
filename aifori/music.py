@@ -22,7 +22,7 @@ def get_music_voice(desc: str) -> Voice:
 
 
 MusicToolDesc = ToolDesc(name="play_music", description="根据描述播放音乐",
-                         parameters=[Parameter(name="desc", description="音乐描述", type="string", required=True)])
+                         parameters=[Parameter(name="music_desc", description="音乐描述", type="string", required=True)])
 
 
 if __name__ == "__main__":

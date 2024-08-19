@@ -22,13 +22,13 @@ from liteai.core import ToolDesc, Voice
 class AIAgent(BaseUser):
     role = "assistant"
 
-    def __init__(self, model: str, voice_config: dict = {}, tools: List[ToolDesc] = [], **kwargs):
+    def __init__(self, model: str, voice_config: dict = {}, tools: List[ToolDesc | dict] = [], **kwargs):
         super().__init__(**kwargs)
         self.memory = DBMemory(agent_id=self.id)
         self.model = model
         self.voice_config = voice_config
         self.system_template = DEFAULT_SYSTEM_TEMPLATE
-        self.tools = tools
+        self.tools = [e if isinstance(e, ToolDesc) else ToolDesc(**e) for e in tools]
 
     def _build_system(self, user_id: str) -> str:
         user = Human.from_config(id=user_id)
@@ -66,7 +66,7 @@ class AIAgent(BaseUser):
         kwargs["handle_system"] = False
 
         llm_resp = liteai_api.chat(model=self.model, messages=messages, stream=stream, meta=meta,
-                                   tools=self.tools, **kwargs, log_level=LITE_AI_LOG_LEVEL)
+                                   tools=self.tools, **kwargs, log_level="DEBUG")
 
         return AssistantMessage(content=llm_resp.content, tool_calls=llm_resp.tool_calls)
 

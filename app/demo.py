@@ -16,8 +16,8 @@ import streamlit as st
 
 from aifori.client import AiForiClient
 from aifori.config import *
-from aifori.core import ChatRequest, SpeakRequest
-from liteai.core import Voice
+from aifori.core import AssistantMessage, ChatRequest, SpeakRequest
+from liteai.core import ToolCall, Voice
 from liteai.voice import get_duration
 from snippets import set_logger, load, dump
 from app.config import *
@@ -37,6 +37,7 @@ class SessionManager:
         self.logger = set_logger("DEV", __name__)
         self.client = AiForiClient(host=HOST)
         self.new_session()
+        self.callbacks = dict(play_music=self.on_play_music)
 
     def update_profile(self, assistant_id, assistant_name, assistant_desc, user_id, user_name, user_desc, model, voice_config):
         logger.debug("updating profile")
@@ -55,7 +56,7 @@ class SessionManager:
     def get_resp(self, prompt):
         req = ChatRequest(message=prompt, user_id=self.user_id, assistant_id=self.assistant_id, session_id=self.session_id)
         resp = self.client.chat(req, stream=True)
-        return resp.content
+        return resp
 
     def message2voice(self, message: str, voice_config):
         local_voice_path = os.path.join(VOICE_DIR, self.session_id, f"{self.round}.mp3")
@@ -67,6 +68,20 @@ class SessionManager:
     def add_message(self, message):
         self.logger.info(f"add message: {message}")
         self.messages.append(message)
+
+    def on_play_music(self, message: AssistantMessage, tool_call: ToolCall, **kwargs):
+        logger.debug(f"play music with {tool_call=}, {kwargs=}")
+        new_kwargs = dict(**tool_call.parameters, **kwargs)
+        logger.debug(f"play music with {new_kwargs=}")
+        stt = new_kwargs.pop("stt")
+        message.content = "好的，这就为您播放音乐"
+        voice = self.client.play_music(**new_kwargs, play=False, local_voice_path="./tmp_music.mp3")
+        play_voice(voice=voice, stt=stt)
+        return voice
+
+    def on_tool(self, message, **kwargs):
+        self.client.on_tool(message, callbacks=self.callbacks,
+                            user_id=session_manager.user_id, **kwargs)
 
 
 if not st.session_state.get("session_manager"):
@@ -138,7 +153,7 @@ for message in session_manager.messages:
         st.markdown(message["content"])
 
 
-def play_voice(voice: Voice):
+def play_voice(voice: Voice, stt):
     from pydub import AudioSegment
     first_voice_latency = time.time() - stt
     for idx, chunk in enumerate(voice.byte_stream):
@@ -176,25 +191,30 @@ if prompt := st.chat_input("你好，你是谁？"):
         full_response = ""
 
     stt = time.time()
-    resp = session_manager.get_resp(prompt)
+    message = session_manager.get_resp(prompt)
+    session_manager.on_tool(message, stt=stt)
 
-    for token in resp:
+    fist_token_latency = 0.
+    for token in message.content:
         fist_token_latency = time.time() - stt
         full_response += token
         # st.info(full_response)
         message_placeholder.markdown(full_response + "▌")
     message_placeholder.markdown(full_response)
+
     full_token_latency = time.time() - stt
     msg = f"返回[{len(full_response)}]字, 首字延时[{fist_token_latency: 2.3f}]s, 回复完成延时[{full_token_latency:2.3f}]s"
     st.info(msg)
 
+    voice_path = None
     if speak:
         voice_config = dict(voice_id=voice_id, speed=speed, pitch=pitch)
         voice = session_manager.message2voice(full_response, voice_config=voice_config)
-        play_voice(voice)
+        play_voice(voice, stt)
+        voice_path = voice.file_path
 
     user_message = {"role": "user", "content": prompt, "session_id": session_manager.session_id}
-    assistant_message = {"role": "assistant", "content": full_response, "session_id": session_manager.session_id, "voice_path": voice.file_path}
+    assistant_message = {"role": "assistant", "content": full_response, "session_id": session_manager.session_id, "voice_path": voice_path}
 
     session_manager.add_message(user_message)
     session_manager.add_message(assistant_message)
