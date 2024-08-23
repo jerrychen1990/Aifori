@@ -142,7 +142,7 @@ class AiForiClient(object):
                                 json=speak_req.model_dump(), stream=True).iter_lines()
         voice = decode_voice(resp, local_voice_path)
         if play:
-            voice = play_voice(voice)
+            play_voice(voice)
         return voice
 
     def chat_speak_stream(self, chat_speak_request: ChatSpeakRequest, local_voice_path: str = None, play: bool = False) -> Tuple[AssistantMessage, Voice]:
@@ -166,7 +166,6 @@ class AiForiClient(object):
         new_kwargs = dict(**tool_call.parameters, **kwargs)
         logger.debug(f"play music with {new_kwargs=}")
         self.play_music(**new_kwargs)
-        message.content = "好的，这就为您播放音乐"
 
     def on_tool(self, message: AssistantMessage, callbacks=Dict[str, Callable], **kwargs):
         if tool_calls := message.tool_calls:
