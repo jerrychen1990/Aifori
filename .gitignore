@@ -176,7 +176,7 @@ agents/
 output/
 data/demo
 record/adopters.jsonl
-*.mp3
+/*.mp3
 qdrant_storage/
 db/
 cert.pem
@@ -184,3 +184,4 @@ key.pem
 dump.rdb
 app/profile.json
 app/ws.py
+tmp/
