@@ -17,6 +17,7 @@ from aifori.core import ChatRequest
 from aifori.music import MusicToolDesc
 from aifori.util import show_message
 from liteai.core import LLMGenConfig
+from liteai.tool import CurrentContextToolDesc
 from liteai.voice import play_file, play_voice
 from snippets.logs import set_logger
 
@@ -29,10 +30,12 @@ class APITestCase(unittest.TestCase):
         cls.assistant_id = "ut_assistant"
         cls.user_id = "ut_user"
         cls.session_id = "ut_session"
+        cls.tools = [CurrentContextToolDesc]
 
     def test_assistant1(self):
         # Test creating a new assistant
-        assistant = create_assistant(name=self.assistant_id, desc=self.assistant_id, id=self.assistant_id, model=DEFAULT_MODEL, do_save=True)
+        assistant = create_assistant(name=self.assistant_id, desc=self.assistant_id, id=self.assistant_id, model=DEFAULT_MODEL,
+                                     do_save=True, tools=self.tools)
         self.assertIsNotNone(assistant)
 
     def test_create_user2(self):
@@ -41,7 +44,8 @@ class APITestCase(unittest.TestCase):
         self.assertIsNotNone(user)
 
     def test_chat_assistant3(self):
-        create_assistant(name=self.assistant_id, desc=self.assistant_id, id=self.assistant_id, model=DEFAULT_MODEL, do_save=True)
+        create_assistant(name=self.assistant_id, desc=self.assistant_id, id=self.assistant_id, model=DEFAULT_MODEL,
+                         do_save=True, tools=self.tools)
         create_user(name=self.user_id, desc=self.user_id, id=self.user_id, do_save=True)
 
         req = ChatRequest(assistant_id=self.assistant_id, user_id=self.user_id, session_id=self.session_id,
@@ -49,8 +53,21 @@ class APITestCase(unittest.TestCase):
         message = chat_assistant(req, stream=False)
         show_message(message)
         assert "ut_assistant" in message.content.lower()
+
         req = ChatRequest(assistant_id=self.assistant_id, user_id=self.user_id, session_id=self.session_id,
-                          message="作一首古诗", do_remember=True)
+                          message="推荐三首歌", do_remember=True)
+        message = chat_assistant(req, stream=True)
+        show_message(message)
+
+        # 测试多轮
+        req = ChatRequest(assistant_id=self.assistant_id, user_id=self.user_id, session_id=self.session_id,
+                          message="介绍一下第三首", do_remember=False)
+        message = chat_assistant(req, stream=False)
+        show_message(message)
+
+        # 测试工具调用
+        req = ChatRequest(assistant_id=self.assistant_id, user_id=self.user_id, session_id=self.session_id,
+                          message="今天是几号呀，星期几？", do_remember=True)
         message = chat_assistant(req, stream=True)
         show_message(message)
 
@@ -85,7 +102,6 @@ class APITestCase(unittest.TestCase):
         req = ChatRequest(assistant_id=assistant.id, user_id=self.user_id, session_id=self.session_id,
                           message="推荐一首欢快的歌曲", do_remember=True)
         message = chat_assistant(req, stream=False)
-        
 
         show_message(message)
 

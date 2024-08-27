@@ -74,7 +74,7 @@ DEFAULT_SYSTEM_TEMPLATE = """你是一个善解人意的聊天机器人，你需
 
 
 # LiteAI配置
-LITE_AI_LOG_LEVEL = "INFO"
+LITE_AI_LOG_LEVEL = "DEBUG"
 
 # 日志配置
 

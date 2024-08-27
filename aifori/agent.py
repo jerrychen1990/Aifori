@@ -49,7 +49,8 @@ class AIAgent(BaseUser):
         mems = "可供参考的历史记忆:\n" + "\n".join(mems)
         return mems
 
-    def chat(self, user_id: str, message: UserMessage,  session_id=None, recall_memory=False, stream=False,  ** kwargs) -> AssistantMessage:
+    def chat(self, user_id: str, message: UserMessage,  session_id=None, recall_memory=False, stream=False,
+             model: str = None,  ** kwargs) -> AssistantMessage:
         user = Human.from_config(id=user_id)
         history = SESSION_MANAGER.get_history(_from=[self.id, user_id], to=[self.id, user_id], session_id=session_id)
         meta = dict(user_info=user.desc, user_name=user.name, bot_info=self.desc, bot_name=self.name)
@@ -64,9 +65,13 @@ class AIAgent(BaseUser):
         messages = [dict(role="system", content=system)] + history + [message]
 
         kwargs["handle_system"] = False
+        if model:
+            logger.debug(f"chat with tmp model: {model}")
+        else:
+            model = self.model
 
-        llm_resp = liteai_api.chat(model=self.model, messages=messages, stream=stream, meta=meta,
-                                   tools=self.tools, **kwargs, log_level="DEBUG")
+        llm_resp = liteai_api.agent_chat(model=model, messages=messages, stream=stream, meta=meta,
+                                         tools=self.tools, **kwargs, log_level=LITE_AI_LOG_LEVEL)
 
         return AssistantMessage(content=llm_resp.content, tool_calls=llm_resp.tool_calls)
 

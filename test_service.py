@@ -22,7 +22,7 @@ from snippets import load
 
 set_logger("dev", __name__)
 
-HOST = "http://localhost:9100"
+HOST = "http://localhost:9001"
 ASSISTANT_ID = "test_service_assistant"
 USER_ID = "test_service_user"
 SESSION_ID = "test_service_session"

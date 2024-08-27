@@ -16,3 +16,4 @@ pydub
 celery
 redis
 gtts
+python-multipart

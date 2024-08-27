@@ -18,6 +18,8 @@ from loguru import logger
 
 from liteai.core import ToolCall, Voice
 from liteai.voice import build_voice, play_voice
+from snippets import jdumps
+from cachetools import LRUCache, cached
 
 # urllib3.disable_warnings()
 
@@ -35,7 +37,7 @@ def decode_message(stream: Iterable[dict | bytes], assistant_id: str) -> Assista
     tool_calls = []
     for tool in tool_stream:
         if "tool_call" in tool:
-            tool_call = eval(tool["tool_call"])
+            tool_call = json.loads(tool["tool_call"])
             logger.debug(f"decode tool call: {tool_call}")
             tool_calls.append(ToolCall.model_validate(tool_call))
 
@@ -65,11 +67,11 @@ class AiForiClient(object):
     def __init__(self, host: str):
         self.host = host
 
-    def _do_request(self, path, method="post", json=dict(), stream=False, files=dict()):
+    def _do_request(self, path, method="post", _json=dict(), stream=False, files=dict()):
         url = f"{self.host}{path}"
-        logger.debug(f"{method.upper()} to {url} with {json=}, {files=}, {stream=}")
-        if json:
-            resp = requests.request(method, url, json=json, stream=stream, verify=False)
+        logger.debug(f"{method.upper()} to {url} with json=\n{jdumps(_json)}, {files=}, {stream=}")
+        if _json:
+            resp = requests.request(method, url, json=_json, stream=stream, verify=False)
         else:
             resp = requests.request(method, url, files=files, stream=stream, verify=False)
         resp.raise_for_status()
@@ -87,12 +89,13 @@ class AiForiClient(object):
 
     def create_assistant(self, assistant_id: str, name: str, desc: str, model: str, voice_config: dict = dict()) -> dict:
         data = {'id': assistant_id, 'name': name, 'desc': desc, 'model': model, 'voice_config': voice_config}
-        resp = self._do_request('/assistant/create', json=data)
+        resp = self._do_request('/assistant/create', _json=data)
         return resp
 
+    @cached(LRUCache(maxsize=128))
     def get_assistant(self, assistant_id: str):
         data = {'id': assistant_id}
-        resp = self._do_request('/assistant/get', json=data)
+        resp = self._do_request('/assistant/get', _json=data)
         return resp
 
     def get_or_create_assistant(self, assistant_id: str, name: str, desc: str, model: str, voice_config: dict = dict()) -> dict:
@@ -103,17 +106,18 @@ class AiForiClient(object):
 
     def delete_assistant(self, assistant_id: str) -> dict:
         data = {'id': assistant_id}
-        resp = self._do_request('/assistant/delete', json=data)
+        resp = self._do_request('/assistant/delete', _json=data)
         return resp
 
     def create_user(self, user_id: str, name: str, desc: str) -> dict:
         data = {'id': user_id, 'name': name, 'desc': desc}
-        resp = self._do_request('/user/create', json=data)
+        resp = self._do_request('/user/create', _json=data)
         return resp
 
+    @cached(LRUCache(maxsize=128))
     def get_user(self, user_id: str):
         data = {'id': user_id}
-        resp = self._do_request('/user/get', json=data)
+        resp = self._do_request('/user/get', _json=data)
         return resp
 
     def get_or_create_user(self, user_id: str, name: str, desc: str) -> dict:
@@ -124,29 +128,29 @@ class AiForiClient(object):
 
     def delete_user(self, user_id: str) -> dict:
         data = {'id': user_id}
-        resp = self._do_request('/user/delete', json=data)
+        resp = self._do_request('/user/delete', _json=data)
         return resp
 
     def chat(self, chat_request: ChatRequest, stream=True) -> AssistantMessage:
         data = chat_request.model_dump()
         if stream:
-            resp = self._do_request('/assistant/chat_stream', json=data, stream=True).iter_lines()
+            resp = self._do_request('/assistant/chat_stream', _json=data, stream=True).iter_lines()
             assistant_id = data["assistant_id"]
             return decode_message(resp, assistant_id)
         else:
-            resp = self._do_request('/assistant/chat', json=data)
+            resp = self._do_request('/assistant/chat', _json=data)
             return AssistantMessage.model_validate(resp)
 
     def speak(self, speak_req: SpeakRequest, play=False, local_voice_path: str = None):
         resp = self._do_request('/assistant/speak_stream',
-                                json=speak_req.model_dump(), stream=True).iter_lines()
+                                _json=speak_req.model_dump(), stream=True).iter_lines()
         voice = decode_voice(resp, local_voice_path)
         if play:
             play_voice(voice)
         return voice
 
     def chat_speak_stream(self, chat_speak_request: ChatSpeakRequest, local_voice_path: str = None, play: bool = False) -> Tuple[AssistantMessage, Voice]:
-        resp = self._do_request('/assistant/chat_speak_stream', json=chat_speak_request.model_dump(), stream=True).iter_lines()
+        resp = self._do_request('/assistant/chat_speak_stream', _json=chat_speak_request.model_dump(), stream=True).iter_lines()
         resp = (json.loads(item.decode("utf-8")) for item in resp)
         message, voice = decode_chunks(resp, assistant_id=chat_speak_request.assistant_id,
                                        return_voice=chat_speak_request.return_voice, local_file_path=local_voice_path)
@@ -155,7 +159,7 @@ class AiForiClient(object):
         return message, voice
 
     def play_music(self, user_id: str, music_desc: str, local_voice_path: str = None, play: bool = True, max_seconds=None) -> Voice:
-        resp = self._do_request('/assistant/play_music_stream', json=dict(user_id=user_id, music_desc=music_desc), stream=True).iter_lines()
+        resp = self._do_request('/assistant/play_music_stream', _json=dict(user_id=user_id, music_desc=music_desc), stream=True).iter_lines()
         voice = decode_voice(resp, local_voice_path)
         if play:
             play_voice(voice, max_seconds=max_seconds)
@@ -175,11 +179,11 @@ class AiForiClient(object):
                     callbacks[tool_call.name](message=message, tool_call=tool_call, **kwargs)
 
     def clear_session(self, session_id: str) -> dict:
-        resp = self._do_request('/session/clear', json={'session_id': session_id})
+        resp = self._do_request('/session/clear', _json={'session_id': session_id})
         return resp
 
     def list_messages(self, assistant_id: str,  session_id: str = None, limit: int = 10) -> List[Message]:
-        resp = self._do_request('/message/list', json={'assistant_id': assistant_id, 'session_id': session_id, 'limit': limit})
+        resp = self._do_request('/message/list', _json={'assistant_id': assistant_id, 'session_id': session_id, 'limit': limit})
         return [Message.model_validate(message) for message in resp]
 
     def update_rule(self, rule_path: str) -> str:

@@ -116,6 +116,7 @@ def chat_assistant(chat_request: ChatRequest, stream=True, **kwargs) -> Assistan
     else:
         assistant_message = assistant.chat(user_id=user.id,
                                            message=user_message,  stream=stream, session_id=session_id, recall_memory=chat_request.recall_memory,
+                                           model=chat_request.model,
                                            **chat_request.llm_gen_config.model_dump(), **kwargs)
     if chat_request.do_remember:
         do_remember(user_message, user.id, assistant_message, assistant.id, session_id)

@@ -85,6 +85,7 @@ class ChatRequest(BaseModel):
     user_id: str = Field(description="用户的ID,唯一键", examples=["test_user"])
     session_id: str = Field(default=None, description="对话的ID,唯一键", examples=["test_session"])
     message: str = Field(description="用户发送的消息", examples=["你好呀，你叫什么名字？"])
+    model: Optional[str] = Field(default=None, description="模型的ID,唯一键")
     do_remember: bool = Field(default=False, description="Agent是否记忆这轮对话")
     recall_memory: bool = Field(default=False, description="是否唤起长期记忆")
     llm_gen_config: LLMGenConfig = Field(default=LLMGenConfig(), description="llm的配置")

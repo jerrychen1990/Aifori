@@ -9,9 +9,11 @@
 
 import unittest
 
+
 from aifori.agent import *
 from aifori.api import create_assistant, create_user, get_assistant, clear_session
 from loguru import logger
+from liteai.tool import CurrentContextToolDesc
 from aifori.config import *
 from aifori.music import MusicToolDesc
 from aifori.util import show_message
@@ -27,7 +29,8 @@ class TestAssistant(unittest.TestCase):
         logger.info("start test assistant")
         cls.assistant_id = "ut_assistant"
         cls.user_id = "ut_user"
-        cls.assistant = create_assistant(id=cls.assistant_id, name=DEFAULT_AI_NAME, desc=DEFAULT_AI_DESC, model=DEFAULT_MODEL, exists_ok=True)
+        cls.assistant = create_assistant(id=cls.assistant_id, name=DEFAULT_AI_NAME, desc=DEFAULT_AI_DESC,
+                                         model=DEFAULT_MODEL, exists_ok=True, tools=[CurrentContextToolDesc])
         cls.user = create_user(id=cls.user_id, name=DEFAULT_USER_NAME, desc=DEFAULT_USER_DESC, exists_ok=True)
 
     def test_assistant_chat(self):
@@ -47,6 +50,12 @@ class TestAssistant(unittest.TestCase):
         message: UserMessage = UserMessage(content="详细介绍一下第三首", user_id=self.user_id, session_id=session_id)
         resp = self.assistant.chat(self.user_id, message, max_tokens=64)
         show_message(resp)
+
+        # 测试工具调用
+        message: UserMessage = UserMessage(content="今天是几号呀，星期几？", user_id=self.user_id, session_id=session_id)
+        resp = self.assistant.chat(self.user_id, message, max_tokens=64)
+        show_message(resp)
+
         # 清空session
         clear_session(session_id)
 
