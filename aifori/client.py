@@ -141,7 +141,7 @@ class AiForiClient(object):
             resp = self._do_request('/assistant/chat', _json=data)
             return AssistantMessage.model_validate(resp)
 
-    def speak(self, speak_req: SpeakRequest, play=False, local_voice_path: str = None):
+    def speak(self, speak_req: SpeakRequest, play=False, local_voice_path: str = None)-> Voice:
         resp = self._do_request('/assistant/speak_stream',
                                 _json=speak_req.model_dump(), stream=True).iter_lines()
         voice = decode_voice(resp, local_voice_path)

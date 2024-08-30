@@ -1,8 +1,11 @@
 from functools import wraps
+import inspect
 import json
 import shutil
-from fastapi import Body, FastAPI, File, UploadFile, WebSocket
+from fastapi import status
+from fastapi import Body, Depends, FastAPI, File, HTTPException, UploadFile, WebSocket
 from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from aifori.session import SESSION_MANAGER
 from aifori.config import *
 from aifori.core import AssistantMessage, ChatSpeakRequest, Message, ChatRequest, SpeakRequest
@@ -17,8 +20,30 @@ from snippets import load, set_logger
 from snippets.utils import jdumps
 
 set_logger(AIFORI_ENV, __name__, log_dir=os.path.join(LOG_HOME, "service"), show_process=True)
-app = FastAPI(root_path="/api")
+app = FastAPI(root_path="/api", title="Aifori API", description="Aifori API")
 # app = FastAPI()
+
+
+# 创建一个基本HTTP认证的实例
+security = HTTPBasic()
+
+# 模拟存储的用户名和密码（实际应用中应该从数据库或其他安全存储中获取）
+users_db = load(os.path.join(os.path.abspath(os.path.dirname(__file__)), "auth.jsonl"))
+users_db = {e["username"]: e["password"] for e in users_db}
+logger.debug(f"{users_db=}")
+
+
+def authenticate(credentials: HTTPBasicCredentials = Depends(security)):
+    # logger.debug(f"{users_db=}")
+    if not users_db:
+        return True
+    if credentials.username in users_db and users_db[credentials.username] == credentials.password:
+        return True
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Incorrect username or password",
+        headers={"WWW-Authenticate": "Basic"},
+    )
 
 
 class Response(BaseModel):
@@ -51,12 +76,43 @@ def try_wrapper(func):
     return wrapped
 
 
+def add_auth(func):
+    if not users_db:
+        return func
+    # 获取原函数的签名
+    signature = inspect.signature(func)
+    parameters = dict(signature.parameters)
+
+    # 添加新的参数到函数签名中
+    new_param = inspect.Parameter(
+        "credentials",  # 参数名
+        inspect.Parameter.KEYWORD_ONLY,  # 表示这是一个关键字参数
+        default=Depends(authenticate),
+        annotation=HTTPBasicCredentials
+    )
+    parameters["credentials"] = new_param
+
+    @wraps(func)
+    async def wrapped(*args, **kwargs):
+        logger.debug(f"{kwargs=}")
+        kwargs.pop("credentials")
+        return await func(*args, **kwargs)
+
+    # 创建新的签名
+    new_signature = signature.replace(parameters=parameters.values())
+    wrapped.__signature__ = new_signature
+
+    return wrapped
+
+
 @app.get("/health", tags=["common"], description="检查服务是否正常")
+@add_auth
 async def health() -> Response:
     return Response(data=dict(status="ok"))
 
 
 @app.post("/assistant/create", tags=["assistant"], description="创建一个assistant")
+@add_auth
 @try_wrapper
 async def create_assistant(
         id: str = Body(default=None, description="assistant的ID,唯一键，如果不传则自动生成", examples=["test_assistant"]),
@@ -69,6 +125,7 @@ async def create_assistant(
 
 
 @app.post("/assistant/get", tags=["assistant"], description="获取一个assistant")
+@add_auth
 @try_wrapper
 async def get_assistant(id: str = Body(description="assistant的ID,唯一键", examples=["test_assistant"], embed=True)) -> Response:
     assistant = api.get_assistant(id)
@@ -76,6 +133,7 @@ async def get_assistant(id: str = Body(description="assistant的ID,唯一键", e
 
 
 @app.post("/assistant/delete", tags=["assistant"], description="删除一个assistant")
+@add_auth
 @try_wrapper
 async def delete_assistant(id: str = Body(description="assistant的ID,唯一键", examples=["test_assistant"], embed=True)) -> Response:
     api.delete_assistant(id=id)
@@ -83,6 +141,7 @@ async def delete_assistant(id: str = Body(description="assistant的ID,唯一键"
 
 
 @app.post("/user/create", tags=["user"], description="创建一个人类用户")
+@add_auth
 @try_wrapper
 async def create_user(
         id: str = Body(default=None, description="User的ID,唯一键，如果不传则自动生成", examples=["test_user"]),
@@ -93,6 +152,7 @@ async def create_user(
 
 
 @app.post("/user/get", tags=["user"], description="获取一个人类用户")
+@add_auth
 @try_wrapper
 async def get_user(id: str = Body(description="USER的ID,唯一键", examples=["test_user"], embed=True)) -> Response:
     user = api.get_user(id)
@@ -100,6 +160,7 @@ async def get_user(id: str = Body(description="USER的ID,唯一键", examples=["
 
 
 @app.post("/user/delete", tags=["user"], description="删除一个人类用户")
+@add_auth
 @try_wrapper
 async def delete_user(id: str = Body(description="USER的ID,唯一键", examples=["test_user"], embed=True)) -> Response:
     api.delete_user(id=id)
@@ -107,6 +168,7 @@ async def delete_user(id: str = Body(description="USER的ID,唯一键", examples
 
 
 @app.post("/assistant/chat", tags=["assistant"], description="和assistant进行对话, 批式")
+@add_auth
 @try_wrapper
 async def chat_assistant(req: ChatRequest = Body(description="请求体")) -> Response:
     message: AssistantMessage = api.chat_assistant(req, stream=False)
@@ -122,6 +184,7 @@ def message2stream(message: AssistantMessage) -> Iterable[dict]:
 
 
 @app.post("/assistant/chat_stream", tags=["assistant"], description="和Assistant进行对话,可以返回语音,sse流式")
+@add_auth
 @try_wrapper
 async def chat_assistant_stream(req: ChatRequest = Body(description="请求体")) -> StreamingResponse:
     message: AssistantMessage = api.chat_assistant(req, stream=True)
@@ -130,6 +193,7 @@ async def chat_assistant_stream(req: ChatRequest = Body(description="请求体")
 
 
 @app.post("/assistant/speak_stream", tags=["assistant"], description="assistant返回文本对应的语音,sse流式")
+@add_auth
 @try_wrapper
 async def speak_assistant_stream(req: SpeakRequest = Body(description="请求体")) -> StreamingResponse:
     req.voice_path = os.path.join(VOICE_DIR, req.voice_path) if req.voice_path else None
@@ -156,6 +220,7 @@ async def ws_speak_assistant_stream(websocket: WebSocket):
 
 
 @app.post("/assistant/chat_speak_stream", tags=["assistant"], description="assistant返回文本以及对应的语音,sse流式")
+@add_auth
 @try_wrapper
 async def chat_speak_assistant_stream(req: ChatSpeakRequest = Body(description="请求体")) -> StreamingResponse:
     req.voice_path = os.path.join(VOICE_DIR, req.voice_path) if req.voice_path else None
@@ -182,6 +247,8 @@ async def ws_chat_speak_assistant_stream(websocket: WebSocket):
 
 
 @app.post("/session/clear", tags=["session"], description="清空session的历史")
+@add_auth
+@try_wrapper
 async def clear_session(session_id: str = Body(description="session_id", examples=["test_session"], embed=True)) -> Response:
     logger.info(f"clear session {session_id}")
     SESSION_MANAGER.clear_session(session_id)
@@ -189,6 +256,8 @@ async def clear_session(session_id: str = Body(description="session_id", example
 
 
 @app.post("/message/list", tags=["message"], description="列出最近的对话消息", summary="列出最近的对话消息")
+@add_auth
+@try_wrapper
 async def list_messages(session_id: str = Body(description="按照session_id过滤message，不传则不按照session_id过滤", examples=["test_session"], default=None),
                         assistant_id: str = Body(description="按照assistant_id过滤message（所有assistant_id发出或者收到的message），不传则不按照assistant_id过滤",
                                                  examples=["test_assistant"], default=None),
@@ -199,6 +268,7 @@ async def list_messages(session_id: str = Body(description="按照session_id过�
 
 
 @app.post("/rule/update", tags=["rule"], description="更新规则", summary="更新规则")
+@add_auth
 @try_wrapper
 async def update_rule(upload_file: UploadFile = File(description="更新文件, 支持后缀名jsonl")) -> Response:
     logger.info("update rule file with upload file")
@@ -208,6 +278,7 @@ async def update_rule(upload_file: UploadFile = File(description="更新文件, 
 
 
 @app.post("/rule/list", tags=["rule"], description="列出规则", summary="列出规则")
+@add_auth
 @try_wrapper
 async def list_rule() -> Response:
     rules = load(DEFAULT_RULE_PATH)
@@ -222,6 +293,8 @@ async def get():
 
 
 @app.post("/assistant/play_music_stream", tags=["music"], description="播放音乐")
+@add_auth
+@try_wrapper
 async def play_music_stream(user_id: str = Body(description="user_id", examples=["test_user"], embed=True),
                             music_desc: str = Body(description="音乐描述", examples=["dnll"], embed=True)) -> StreamingResponse:
     voice = api.play_music(user_id=user_id, music_desc=music_desc)
