@@ -42,7 +42,7 @@ MEM_CONFIG = {
         }
     }
 }
-MEM_ON = False
+MEM_ON = True
 
 
 # agent配置
@@ -80,30 +80,3 @@ LITE_AI_LOG_LEVEL = "DEBUG"
 
 LOG_HOME = os.getenv("AIFORI_LOG_HOME", os.path.join(AIFORI_HOME, "logs"))
 os.makedirs(LOG_HOME, exist_ok=True)
-
-# STD_FMT = LoguruFormat.DETAIL if AIFORI_ENV == "DEV" else LoguruFormat.SIMPLE
-# STD_LEVEL = "DEBUG" if AIFORI_ENV == "DEV" else "INFO"
-# def MODULE_FILTER(record): return __name__ in record["name"]
-# def SERVICE_FILTER(record): return "service" in record["name"]
-
-
-# FILE_RETENTION = "7 days" if AIFORI_ENV == "DEV" else "30 days"
-
-# handlers = {
-#     "aifori_std": dict(sink=sys.stdout, format=STD_FMT, colorize=True, level=STD_LEVEL, filter=lambda x: MODULE_FILTER(x) or SERVICE_FILTER(x), enqueue=True),
-#     "aifori_output": dict(sink=os.path.join(LOG_HOME, "aifori_output.log"), format=LoguruFormat.File_SIMPLE, level="INFO",
-#                           filter=MODULE_FILTER, enqueue=True, backtrace=True, colorize=True, rotation="00:00", retention=FILE_RETENTION),
-#     "aifori_service_out": dict(sink=os.path.join(LOG_HOME, "service_output.log"), format=LoguruFormat.File_SIMPLE, level="INFO",
-#                                filter=SERVICE_FILTER, enqueue=True, backtrace=True, colorize=True, rotation="00:00", retention=FILE_RETENTION)
-# }
-# if AIFORI_ENV == "DEV":
-#     handlers.update({
-#         "aifori_detail": dict(sink=os.path.join(LOG_HOME, "aifori_detail.log"), format=LoguruFormat.FILE_DETAIL, level="DEBUG",
-#                               filter=MODULE_FILTER, enqueue=True, backtrace=True, colorize=True, rotation="00:00", retention=FILE_RETENTION),
-#         "aifori_detail": dict(sink=os.path.join(LOG_HOME, "service_detail.log"), format=LoguruFormat.FILE_DETAIL, level="DEBUG",
-#                               filter=SERVICE_FILTER, enqueue=True, backtrace=True, colorize=True, rotation="00:00", retention=FILE_RETENTION),
-#     })
-
-# LOG_CONFIG = {
-#     "handlers": handlers
-# }

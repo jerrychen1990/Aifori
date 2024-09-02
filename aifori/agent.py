@@ -12,7 +12,7 @@ import copy
 from loguru import logger
 from aifori.config import *
 from aifori.core import *
-from aifori.memory import MEM, DBMemory
+from aifori.memory import mem0_client, DBMemory
 from liteai import api as liteai_api
 from aifori.session import SESSION_MANAGER
 from liteai.api import tts
@@ -42,10 +42,14 @@ class AIAgent(BaseUser):
             return AssistantMessage(content=(e for e in resp), user_id=self.id)
         return AssistantMessage(content=resp, user_id=self.id)
 
-    def _get_memory(self, message: UserMessage) -> str:
-        mems = MEM.search(query=message.content, user_id=message.user_id)
+    def _get_memory(self, user_id: str, message: UserMessage) -> str:
+        logger.debug("searching memory with query={message.content}, user_id={user_id}")
+        mems = mem0_client.search(query=message.content, user_id=user_id)
+        # mems = MEM.search(query=message.content, user_id=user_id)
         logger.debug(f"get {mems=}")
-        mems = [f"{idx}. {mem['text']}" for idx, mem in enumerate(mems, start=1)]
+        if not mems:
+            return ""
+        mems = [f"{idx}. {mem['memory']}" for idx, mem in enumerate(mems, start=1)]
         mems = "可供参考的历史记忆:\n" + "\n".join(mems)
         return mems
 
@@ -59,7 +63,7 @@ class AIAgent(BaseUser):
 
         user_content = message.content
         if recall_memory:
-            mem = self._get_memory(message=message)
+            mem = self._get_memory(user_id=user_id, message=message)
             user_content = mem+"\n"+user_content
         message = dict(role="user", content=user_content)
         messages = [dict(role="system", content=system)] + history + [message]

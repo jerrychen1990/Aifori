@@ -2,7 +2,7 @@
 import datetime
 from celery import Celery
 from loguru import logger
-from aifori.memory import MEM
+from aifori.memory import mem0_client
 
 # 创建 Celery 应用，指定 Redis 作为消息代理
 app = Celery('task', broker='redis://localhost:6379/0')
@@ -11,14 +11,18 @@ app = Celery('task', broker='redis://localhost:6379/0')
 @app.task
 def add_message2memory(message: dict):
     logger.debug(f"executing task add message2memory with {message}")
-    mem_info = dict(data=message["content"])
+    # mem_info = dict(data=message["content"])
+    kwargs = dict()
     if message["from_role"] == "user":
-        mem_info["user_id"] = message["from_id"]
+        kwargs["user_id"] = message["from_id"]
     else:
-        mem_info["agent_id"] = message["from_id"]
+        kwargs["agent_id"] = message["from_id"]
 
-    logger.debug(f"add {mem_info=} to mem")
-    MEM.add(**mem_info)
+    message = dict(role=message["from_role"], content=message["content"])
+
+    logger.debug(f"add {message=} {kwargs=} to mem")
+    # MEM.add(**mem_info)
+    mem0_client.add(messages=[message], **kwargs)
     logger.debug("add message to mem done")
 
 

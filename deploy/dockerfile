@@ -1,0 +1,56 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+# Install dependencies necessary for building Python
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends wget build-essential libssl-dev zlib1g-dev vim rsync \
+    libbz2-dev libreadline-dev libsqlite3-dev libffi-dev libncurses5-dev libncursesw5-dev \
+    xz-utils tk-dev liblzma-dev python3-openssl git iputils-ping ca-certificates lsof psmisc curl
+
+# 设置编码
+RUN echo 'set encoding=utf-8' >> ~/.vimrc \
+&& echo 'set fileencoding=utf-8' >> ~/.vimrc \
+&& echo 'set termencoding=utf-8' >> ~/.vimrc
+
+
+# 设置环境变量为 UTF-8
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
+
+# 确保 UTF-8 locale 可用
+RUN apt-get install -y locales \
+    && locale-gen en_US.UTF-8 \
+    && dpkg-reconfigure locales
+
+# Download and unpack Python 3.10.12
+RUN  tar -xzf /asset/Python-3.10.12.tgz
+RUN cd Python-3.10.12 && \
+    ./configure --enable-optimizations && \
+    make -j 4 && \
+    make altinstall
+
+RUN update-ca-certificates
+# Install pip for the installed Python version
+RUN ln -s /usr/local/bin/python3.10 /usr/local/bin/python3 && \
+    wget --no-check-certificate https://bootstrap.pypa.io/get-pip.py && \
+    python3 get-pip.py
+RUN ln -s /usr/local/bin/python3 /usr/bin/python
+
+
+
+# 创建项目
+WORKDIR /
+
+# 复制项目文件
+ADD aifori /aifori
+ADD app /app
+ADD script /script
+COPY requirements.txt /requirements.txt
+
+# 安装python包
+# RUN pip install --upgrade pip
+RUN pip install -r requirements.txt --index-url=http://pypi.tuna.tsinghua.edu.cn/simple --trusted-host=pypi.tuna.tsinghua.edu.cn
+RUN pip install -U python-snippets
+
+# 运行项目
+ENTRYPOINT ["bash", "script/start_service.sh"] 

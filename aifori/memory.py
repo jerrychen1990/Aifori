@@ -8,13 +8,14 @@
 '''
 
 import copy
+import os
 from typing import List
 
 
 from aifori.core import Memory, Message, Memory
 from liteai.core import Message
 from pydantic import Field
-import mem0
+from mem0 import MemoryClient
 
 
 class RawMemory(Memory):
@@ -40,7 +41,12 @@ class DBMemory(Memory):
         return None
 
 
-MEM = mem0.Memory()
+mem0_client = MemoryClient(api_key=os.environ.get("MEM0_API_KEY"))
+
+# MEM = mem0.Memory()
+
+
+# mem0.Memory.from_config
 
 # MEM = mem0.Memory.from_config(MEM_CONFIG)
 
