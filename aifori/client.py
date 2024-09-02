@@ -20,6 +20,8 @@ from liteai.core import ToolCall, Voice
 from liteai.voice import build_voice, play_voice
 from snippets import jdumps
 from cachetools import LRUCache, cached
+from requests.auth import HTTPBasicAuth
+
 
 # urllib3.disable_warnings()
 
@@ -64,16 +66,20 @@ def decode_chunks(chunks: Iterable[dict], assistant_id: str, return_voice: bool,
 
 
 class AiForiClient(object):
-    def __init__(self, host: str):
+    def __init__(self, host: str, username: str = "", password: str = ""):
         self.host = host
+        if username and password:
+            self.auth = HTTPBasicAuth(username, password)
+        else:
+            self.auth = None
 
     def _do_request(self, path, method="post", _json=dict(), stream=False, files=dict()):
         url = f"{self.host}{path}"
         logger.debug(f"{method.upper()} to {url} with json=\n{jdumps(_json)}, {files=}, {stream=}")
         if _json:
-            resp = requests.request(method, url, json=_json, stream=stream, verify=False)
+            resp = requests.request(method, url, json=_json, stream=stream, verify=False, auth=self.auth)
         else:
-            resp = requests.request(method, url, files=files, stream=stream, verify=False)
+            resp = requests.request(method, url, files=files, stream=stream, verify=False, auth=self.auth)
         resp.raise_for_status()
         if not stream:
             if resp.json()["code"] != 200:
@@ -141,7 +147,7 @@ class AiForiClient(object):
             resp = self._do_request('/assistant/chat', _json=data)
             return AssistantMessage.model_validate(resp)
 
-    def speak(self, speak_req: SpeakRequest, play=False, local_voice_path: str = None)-> Voice:
+    def speak(self, speak_req: SpeakRequest, play=False, local_voice_path: str = None) -> Voice:
         resp = self._do_request('/assistant/speak_stream',
                                 _json=speak_req.model_dump(), stream=True).iter_lines()
         voice = decode_voice(resp, local_voice_path)
