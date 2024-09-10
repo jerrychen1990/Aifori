@@ -36,7 +36,10 @@ class SessionManager:
         DB.refresh(orm_message)
         logger.info(f"add message {jdumps(orm_message.to_dict(), indent=None)}")
         if MEM_ON:
-            add_message2memory.delay(orm_message.to_dict())
+            try:
+                add_message2memory.delay(orm_message.to_dict())
+            except Exception as e:
+                logger.warning("adding memory to redis failed")
 
     def get_history(self, _from: str | List[str] = None, to: str | List[str] = None, operator="and", session_id: str = None, limit=10) -> List[Message]:
         logger.debug(f"get history with {_from=}. {to=}, {session_id=}, {limit=}")

@@ -175,7 +175,7 @@ class AiForiClient(object):
         logger.debug(f"play music with {tool_call=}, {kwargs=}")
         new_kwargs = dict(**tool_call.parameters, **kwargs)
         logger.debug(f"play music with {new_kwargs=}")
-        self.play_music(**new_kwargs)
+        return self.play_music(**new_kwargs)
 
     def on_tool(self, message: AssistantMessage, callbacks=Dict[str, Callable], **kwargs):
         if tool_calls := message.tool_calls:

@@ -33,7 +33,7 @@ class SessionManager:
         print("setting logger")
 
         self.logger = set_logger("DEV", __name__)
-        self.client = AiForiClient(host=HOST)
+        self.client = AiForiClient(host=HOST, username="aifori", password="aifori")
         self.new_session()
         self.callbacks = dict(play_music=self.on_play_music)
 
